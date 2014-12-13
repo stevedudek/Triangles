@@ -90,6 +90,9 @@ List<Strip> strips = new ArrayList<Strip>();
 
 int NONE = 9999;  // hack: "null" for "int'
 
+//
+// Controller on the bottom of the screen
+//
 // Draw labels has 3 states:
 // 0:LED number, 1:(x,y) coordinate, and 2:none
 int DRAW_LABELS = 2;
@@ -99,7 +102,9 @@ int DRAW_LABELS = 2;
 // false means all Big Triangles overlap
 boolean TILING = true;
 
-int BRIGHTNESS = 100;
+int BRIGHTNESS = 100;  // A percentage
+
+int COLOR_STATE = 0;  // no enum types in processing. Messy
 
 // How many triangles on the base
 int TRI_GEN = 12;
@@ -206,10 +211,9 @@ void draw() {
   pushColorBuffer();
 }
 
-void drawCheckbox(int x, int y, boolean checked) {
-  int size = 20;
+void drawCheckbox(int x, int y, int size, color fill, boolean checked) {
   stroke(0);
-  fill(255);  
+  fill(fill);  
   rect(x,y,size,size);
   if (checked) {    
     line(x,y,x+size,y+size);
@@ -222,24 +226,47 @@ void drawBottomControls() {
   fill(255,255,255);
   rect(0,SCREEN_HEIGHT,SCREEN_WIDTH,40);
   
+  // draw divider lines
+  stroke(0);
+  line(140,SCREEN_HEIGHT,140,SCREEN_HEIGHT+40);
+  line(290,SCREEN_HEIGHT,290,SCREEN_HEIGHT+40);
+  line(470,SCREEN_HEIGHT,470,SCREEN_HEIGHT+40);
+  
   // draw checkboxes
   stroke(0);
   fill(255);
   // Checkbox is always unchecked; it is 3-state
-  drawCheckbox(20,SCREEN_HEIGHT+10, false); // label checkbox
-  drawCheckbox(220,SCREEN_HEIGHT+10, false); // brightness up checkbox
-  drawCheckbox(440,SCREEN_HEIGHT+10, false); // brightness up checkbox
-    
+  rect(20,SCREEN_HEIGHT+10,20,20);  // label checkbox
+  
+  rect(200,SCREEN_HEIGHT+4,15,15);  // minus brightness
+  rect(200,SCREEN_HEIGHT+22,15,15);  // plus brightness
+  
+  drawCheckbox(340,SCREEN_HEIGHT+4,15, color(255,0,0), COLOR_STATE == 1);
+  drawCheckbox(340,SCREEN_HEIGHT+22,15, color(255,0,0), COLOR_STATE == 4);
+  drawCheckbox(360,SCREEN_HEIGHT+4,15, color(0,255,0), COLOR_STATE == 2);
+  drawCheckbox(360,SCREEN_HEIGHT+22,15, color(0,255,0), COLOR_STATE == 5);
+  drawCheckbox(380,SCREEN_HEIGHT+4,15, color(0,0,255), COLOR_STATE == 3);
+  drawCheckbox(380,SCREEN_HEIGHT+22,15, color(0,0,255), COLOR_STATE == 6);
+  
+  drawCheckbox(400,SCREEN_HEIGHT+10,20, color(255,255,255), COLOR_STATE == 0);
+     
   // draw text labels in 12-point Helvetica
   fill(0);
   textAlign(LEFT);
   PFont f = createFont("Helvetica", 12, true);
   textFont(f, 12);  
   text("Toggle Labels", 50, SCREEN_HEIGHT+25);
-  text("Down Brightness", 250, SCREEN_HEIGHT+25);
-  text("Up Brightness", 470, SCREEN_HEIGHT+25);
+  
+  text("-", 190, SCREEN_HEIGHT+16);
+  text("+", 190, SCREEN_HEIGHT+34);
+  text("Brightness", 225, SCREEN_HEIGHT+25);
   textFont(f, 20);
   text(BRIGHTNESS, 150, SCREEN_HEIGHT+28);
+  
+  textFont(f, 12);
+  text("None", 305, SCREEN_HEIGHT+16);
+  text("All", 318, SCREEN_HEIGHT+34);
+  text("Color", 430, SCREEN_HEIGHT+25);
   
   // scale font to size of triangles
   int font_size = 12;  // default size
@@ -256,46 +283,41 @@ void mouseClicked() {
     // clicked draw labels button
     DRAW_LABELS = (DRAW_LABELS + 1) % 3;
    
-  }  else if (mouseX > 220 && mouseX < 250 && mouseY > SCREEN_HEIGHT+10 && mouseY < SCREEN_HEIGHT+30) {
+  }  else if (mouseX > 200 && mouseX < 215 && mouseY > SCREEN_HEIGHT+4 && mouseY < SCREEN_HEIGHT+19) {
     // Bright down checkbox  
     if (BRIGHTNESS > 10) BRIGHTNESS -= 5;
    
     // Bright up checkbox
-  } else if (mouseX > 440 && mouseX < 4700 && mouseY > SCREEN_HEIGHT+10 && mouseY < SCREEN_HEIGHT+30) {
+  } else if (mouseX > 200 && mouseX < 215 && mouseY > SCREEN_HEIGHT+22 && mouseY < SCREEN_HEIGHT+37) {
       if (BRIGHTNESS <= 95) BRIGHTNESS += 5;
-  }
-}
-
-
-
-//
-// setPixel
-//
-// Stuffs color c in pixel (x,y)
-// Will iterate over all grids in case grids overlap
-
-void setPixel(int x, int y, color c) {
-  int LED;
   
-  for (int i=0; i<numBigTri;i++) {
-    if (IsCoordinGrid(x,y,i)) {
-      LED = GetLightFromCoord(x,y,i);
-      //if (i<strips.size()) strips.get(i).setPixel(c, LED);  // Actual
-      triGrid[i].setCellColor(c, LED);  // Simulator
-    }
-  }
-}
-
-//
-// setAll
-//
-// sets all pixels to color c
-void setAll(color c) {
-  for (int grid=0; grid<numBigTri; grid++) {  // Iterate over all grids
-    for (int LED=0; LED < TRI_GEN*TRI_GEN; LED++) {  // Over all pixels
-      if(grid<strips.size()) strips.get(grid).setPixel(c, LED);  // Actual
-      triGrid[grid].setCellColor(c, LED);  // Simulator
-    }
+  }  else if (mouseX > 400 && mouseX < 420 && mouseY > SCREEN_HEIGHT+10 && mouseY < SCREEN_HEIGHT+30) {
+    // No color correction  
+    COLOR_STATE = 0;
+   
+  }  else if (mouseX > 340 && mouseX < 355 && mouseY > SCREEN_HEIGHT+4 && mouseY < SCREEN_HEIGHT+19) {
+    // None red  
+    COLOR_STATE = 1;
+   
+  }  else if (mouseX > 340 && mouseX < 355 && mouseY > SCREEN_HEIGHT+22 && mouseY < SCREEN_HEIGHT+37) {
+    // All red  
+    COLOR_STATE = 4;
+   
+  }  else if (mouseX > 360 && mouseX < 375 && mouseY > SCREEN_HEIGHT+4 && mouseY < SCREEN_HEIGHT+19) {
+    // None blue  
+    COLOR_STATE = 2;
+   
+  }  else if (mouseX > 360 && mouseX < 375 && mouseY > SCREEN_HEIGHT+22 && mouseY < SCREEN_HEIGHT+37) {
+    // All blue  
+    COLOR_STATE = 5;
+   
+  }  else if (mouseX > 380 && mouseX < 395 && mouseY > SCREEN_HEIGHT+4 && mouseY < SCREEN_HEIGHT+19) {
+    // None green  
+    COLOR_STATE = 3;
+   
+  }  else if (mouseX > 380 && mouseX < 395 && mouseY > SCREEN_HEIGHT+22 && mouseY < SCREEN_HEIGHT+37) {
+    // All green  
+    COLOR_STATE = 6;
   }
 }
 
@@ -373,24 +395,6 @@ int grid_height() {
 }
 
 //
-// getBigTri
-//
-// Returns the Big Triangle (grid) number in which
-// the first (x,y) light lies. If no grid, returns null
-//
-// Does not handle well overlapping grids
-// PYTHON IMPLEMENTATION: Return all valid grids and not
-// just the first valid grid
-int getBigTri(int x, int y) {
-  for (int i=0; i<numBigTri; i++) {
-    if (IsCoordinGrid(x,y,i)) {
-      return (i);  // Future implementation - return all valid grids
-    }
-  }
-  return(NONE); // No valid grid found
-}
-
-//
 // IsCoordinGrid
 //
 // Checks to see whether (x,y) is in the grid specified
@@ -419,51 +423,10 @@ boolean IsCoordinGrid(int x, int y, int grid) {
   return (true);
 }
 
-/*
-
-// checkBounds
-//
-// Returns the cell if in bounds or
-// Null is out of bounds
-void checkBounds(int x, int y, int* pixel) {
-  if (getBigTri(x,y) == NONE) {
-    pixel[0] = NONE;
-    pixel[1] = NONE;
-  } else {
-    pixel[0] = x;
-    pixel[1] = y;
-  }
-}
-//
-// getNeighbors
-//
-// Returns the 3 neighboring triangles
-// Out of bounds triangles will be NONE, NONE
-//
-// Must pass in an array of int[3][2] !
-void getNeighbors(int x, int y, int** neighbors) {
-  
-  // Even coordinates are triangles that point down
-  // Go clockwise from the one above
-  if ((x+y) % 2 == 1) {
-    return ([checkBounds(x,y+1,*neighbors[0]),   // Top
-             checkBounds(x+1,y,*neighbors[1]),   // Right
-             checkBounds(x-1,y,*neighbors[2])]); // Left
-  } else {
-    return ([checkBounds(x-1,y,*neighbors[0]),   // Left
-             checkBounds(x+1,y,*neighbors[1]),   // Right
-             checkBounds(x,y-1),*neighbors[2])]; // Bottom 
-  }
-}
-
-*/
-
 //
 // Converts an x,y triangle coordinate into a light number
 // for grid number grid
 //
-// PYTHON implementation: return all valid light numbers
-// handle overlapping grids
 
 int GetLightFromCoord(int x, int y, int grid) {
   if (IsCoordinGrid(x,y,grid) == false) return (NONE);
@@ -810,9 +773,11 @@ void processCommand(String cmd) {
   
   //println(String.format("setting pixel:%d,%d to r:%d g:%d b:%d", tri, pix, r, g, b));
   
-  r = adj_brightness(r);
-  g = adj_brightness(g);
-  b = adj_brightness(b);
+  color correct = colorCorrect(r,g,b);
+  
+  r = adj_brightness(red(correct));
+  g = adj_brightness(green(correct));
+  b = adj_brightness(blue(correct));
   
   triGrid[tri].setCellColor(color(r,g,b), pix);  // Simulator
   setPixelBuffer(tri, pix, r, g, b);  // Lights  
@@ -870,8 +835,88 @@ private void prepareExitHandler () {
 //  Routines for the strip buffer
 //
 
-int adj_brightness(int value) {
-  return (value * BRIGHTNESS / 100);
+int adj_brightness(float value) {
+  return (int)(value * BRIGHTNESS / 100);
+}
+
+color colorCorrect(int r, int g, int b) {
+  switch(COLOR_STATE) {
+    case 1:  // no red
+      if (r > 0) {
+        if (g == 0) {
+          g = r;
+          r = 0;
+        } else if (b == 0) {
+          b = r;
+          r = 0;
+        }
+      }
+      break;
+    
+    case 2:  // no green
+      if (g > 0) {
+        if (r == 0) {
+          r = g;
+          g = 0;
+        } else if (b == 0) {
+          b = g;
+          g = 0;
+        }
+      }
+      break;
+    
+    case 3:  // no blue
+      if (b > 0) {
+        if (r == 0) {
+          r = b;
+          b = 0;
+        } else if (g == 0) {
+          g = b;
+          b = 0;
+        }
+      }
+      break;
+    
+    case 4:  // all red
+      if (r == 0) {
+        if (g > b) {
+          r = g;
+          g = 0;
+        } else {
+          r = b;
+          b = 0;
+        }
+      }
+      break;
+    
+    case 5:  // all green
+      if (g == 0) {
+        if (r > b) {
+          g = r;
+          r = 0;
+        } else {
+          g = b;
+          b = 0;
+        }
+      }
+      break;
+    
+    case 6:  // all blue
+      if (b == 0) {
+        if (r > g) {
+          b = r;
+          r = 0;
+        } else {
+          b = g;
+          g = 0;
+        }
+      }
+      break;
+    
+    default:
+      break;
+  }
+  return color(r,g,b);   
 }
 
 void initializeColorBuffers() {
