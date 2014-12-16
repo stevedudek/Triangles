@@ -84,7 +84,7 @@ int BRIGHTNESS = 100;  // A percentage
 int COLOR_STATE = 0;  // no enum types in processing. Messy
 
 // Count down globals
-int number_counter = 30;  // Starting seconds
+int number_counter = 20;  // Starting seconds
 float begin_scroll = 0.0;
 float end_scroll = 2.0;
 boolean count_down = false;  // Don't change this
@@ -467,7 +467,7 @@ void drawBottomControls() {
   textAlign(LEFT);
   PFont f = createFont("Helvetica", 12, true);
   textFont(f, 12);  
-  text("30 sec start", 50, SCREEN_HEIGHT+25);
+  text("Start/Stop", 50, SCREEN_HEIGHT+25);
   
   text("-", 190, SCREEN_HEIGHT+16);
   text("+", 190, SCREEN_HEIGHT+34);
@@ -1161,7 +1161,9 @@ void movePixelsToBuffer() {
         if (coord.outofbounds()) continue;  // Memory fault
         int pix = GetLightFromCoord(coord.x,coord.y,0);  // Works!
         if (!isPointUp(getBigX(tri),getBigY(tri))) {  // Gotta rotate the image for point down triangles
-          pix = rotateclock[pix];
+          coord.y = TRI_GEN-y-1;
+          coord.x = (TRI_GEN*2)-x-y-1;
+          pix = rotatecounter[pix];
         }
         RGBColor rgb = pixelarray.Pixels[get_index(coord)].pixcolor;
         int r = (int)rgb.r;
