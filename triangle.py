@@ -12,12 +12,12 @@ Direction: As viewed from corner, lights go 'L' = Left, 'R' = Right
 """
 NUM_BIG_TRI = 6
 
-BIG_COORD = [ ((0, 0), 'L', 'R'),
+BIG_COORD = [ ((0, 0), 'C', 'R'),
               ((0, 1), 'L', 'R'),
               ((2, 0), 'L', 'R'),
-              ((2, 1), 'L', 'R'),
-              ((1, 0), 'L', 'R'),
-              ((1, 1), 'L', 'R') ]
+              ((2, 1), 'C', 'R'),
+              ((1, 0), 'C', 'R'),
+              ((1, 1), 'C', 'R') ]
 
 from HelperFunctions import ROTATE_CLOCK, ROTATE_COUNTER, ROTATE_COORD_CLOCK
 from HelperFunctions import distance

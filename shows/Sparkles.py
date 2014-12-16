@@ -36,7 +36,7 @@ class Sparkles(object):
 		self.sparkles = []	# List that holds Sparkle objects
 		self.speed = 0.1
 		self.color = randColor()
-		self.spark_num = 200
+		self.spark_num = 400
 		          
 	def next_frame(self):
 		
