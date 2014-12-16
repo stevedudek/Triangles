@@ -85,8 +85,8 @@ int COLOR_STATE = 0;  // no enum types in processing. Messy
 
 // Count down globals
 int number_counter = 20;  // Starting seconds
-float begin_scroll = 0.0;
-float end_scroll = 2.0;
+float begin_scroll = 0.4;
+float end_scroll = 1.6;
 boolean count_down = false;  // Don't change this
 long savedTime;
 String filename = "11.jpg";

@@ -104,6 +104,8 @@ and a second array for the connectors:
 
 Update the values like you did for triangle.py and save the changes.
 
+**Down the same array update for the ScrollingCountDown.pde!**
+
 ### Coordinate
 
 The Triangles tile on a grid, like in the picture above. If you change the display of the Triangles, change their (x,y) coordinates. These coordinates are relative so it doesn't matter where you start, although for simplicity, make the first coordinate close to (0,0).
@@ -192,13 +194,29 @@ From the terminal, set up Sparkles to run for 13 hours by typing:
 
 ### Just before midnight
 
-Stop the Sparkles show from the terminal with:
+In Processing, open but don't run this sketch:
+
+	ScrollingCountDown.pde
+	
+### At Midnight
+
+One minute before minute, stop the Sparkles show from the terminal with:
 
 	ctrl-C
 
+Immediately close the Simulator screenshot by clicking the red button:
+
+![image](red_button.png)
+
+Start the ScrollingCountDown.pde by clicking the go arrow on the Processing sketch.
+
+![image](start_arrow.png)
+
+Click the Start/Stop box at exactly 20 seconds to midnight.
+
 ### Just after midnight
 
-Run all shows with:
+After the countdown finishes, close the ScrollingCountDown simulator by clicking its red button. Restart the regular TrianglesSimulatorAndLighter by clicking its go arrow. On the terminal, run all shows with:
 
 	python go.py
 	
