@@ -89,6 +89,7 @@ float begin_scroll = 0.0;
 float end_scroll = 2.0;
 boolean count_down = false;  // Don't change this
 long savedTime;
+String filename = "11.jpg";
 
 boolean vertcenter = true;         // Do you want to take a vertical center slice of the image?
 boolean horizcenter = false;        // Do you want to take a horizontal center slice of the image?
@@ -219,7 +220,14 @@ class PixelArray {
   PixelArray(int size) {
     this.size = size;
     this.Pixels = new Pixel[size];
-    for (int i = 0; i < size; i++) Pixels[i] = new Pixel();
+    for (int i = 0; i < size; i++) {
+      Pixels[i] = new Pixel();
+    }
+    BlackAllPixels();
+  }
+  
+  void EmptyAllPixels() {
+    for (int i = 0; i < size; i++) EmptyPixel(i);
   }
   
   void EmptyPixel(int index) {
@@ -228,6 +236,11 @@ class PixelArray {
     } else {
       Pixels[index].numitems = 0;
     }
+  }
+  
+  void BlackAllPixels() {
+    RGBColor black = new RGBColor(0,0,0);
+    for (int i = 0; i < size; i++) StuffPixelWithColor(i, black);
   }
   
   void StuffPixelWithColor(int index, RGBColor rgb) {
@@ -299,31 +312,39 @@ void draw() {
       drawBigFrame(i);
     }
   }
-  if (count_down && number_counter > 0) {  // We're counting!
-    long currTime = millis();
-    long diffTime = currTime - savedTime;
-    
-    if (diffTime > 1000) {  // 1 second
-      savedTime = currTime + 1000 - diffTime;
-      diffTime -= 1000;
-      number_counter -= 1;
-      if (number_counter < 0) count_down = false;
-      if (number_counter <= 11 && number_counter >= 0) {
-        String filename = number_counter + ".jpg";
+  
+  if (count_down) {
+    if (number_counter >= 0) {  // We're counting!
+      long currTime = millis();
+      long diffTime = currTime - savedTime;
+      
+      if (diffTime > 1000) {  // 1 second
+        savedTime = currTime + 1000 - diffTime;
+        diffTime -= 1000;
+        number_counter -= 1;
+        if (number_counter < 0) {
+          count_down = false;
+          forceBlack();
+        }
+        if (number_counter <= 11 && number_counter >= 0) {
+          filename = number_counter + ".jpg";
+        }
+      }
+      if (number_counter < 12 && count_down) {  // We're displaying!
+        BlendImages(filename, calc_scroll_amount(diffTime));
+        DumpImageIntoPixels();
+        movePixelsToBuffer();
+        sendDataToLights();
+        pushColorBuffer();
+        pixelarray.EmptyAllPixels();
       }
     }
-    float scroll_amount = calc_scroll_amount(diffTime);
-    
-    BlendImages(filename, scroll_amount);
-    movePixelsToBuffer();
-    sendDataToLights();
-    pushColorBuffer();
   }
 }
 
 float calc_scroll_amount(long time) {
   if (time > 1000) time = 1000;
-  return ((end_scroll - begin_scroll) * (1000-diffTime) / 1000);
+  return (begin_scroll + ((end_scroll - begin_scroll) * time / 1000));
 }
 
 void BlendImages(String file_name, float scroll_amount) {
@@ -333,38 +354,63 @@ void BlendImages(String file_name, float scroll_amount) {
   // Figure out the cropped dimensions of the image
   CalcPixelParameters(img.width, img.height);
   int numberHeight = endHeight - startHeight;
-  int backWidth = numberHeight / 0.866;
+  int backWidth = (int)(numberHeight / 0.866);
   
-  bgnd = new PImage(backWidth, numberHeight);
+  // Create the screen image and fill it with all black
+  bgnd = createImage(backWidth, numberHeight, RGB);
+  bgnd.loadPixels();
   
-  for (int j = 0; j < numberHeight; j++) {
-    for (int i = 0; i < backWidth; i++) {
-      if () {
-      } else {
-        
+  for (int i = 0; i < bgnd.pixels.length; i++) {
+    bgnd.pixels[i] = color(0, 0, 0);  // Black
+  }
+  // Now blend
+  if (scroll_amount < 1.0) {  // Number is coming in from left of screen
+    int crop_start = (int)((endWidth-startWidth)*(1.0 - scroll_amount));
+    
+    bgnd.blend(img,  // src
+      startWidth + crop_start,  //sx
+      startHeight,  // sy
+      (endWidth - startWidth) - crop_start,  // sw
+      numberHeight,  // sh
+      0,  // dx
+      0,  // dy
+      (endWidth - startWidth) - crop_start,  // dw
+      bgnd.height,  // dh
+      LIGHTEST);
+  } else {  // Number is leaving to right of screen
+    int crop_start = (int)(bgnd.width * (scroll_amount - 1.0));
+    bgnd.blend(img,  // src
+      0,  //sx
+      startHeight,  // sy
+      bgnd.width - crop_start,  // sw
+      numberHeight,  // sh
+      crop_start,  // dx
+      0,  // dy
+      bgnd.width - crop_start,  // dw
+      bgnd.height,  // dh
+      LIGHTEST);
+  }
+  bgnd.updatePixels();
 }
 
-void DumpImageIntoPixels(String file_name) {
+void DumpImageIntoPixels() {
 
-  img = loadImage(file_name);  // Load image
-  img.loadPixels();
-  
   // Figure out the cropped dimensions of the image
   // Figure out the size of each little hex. Sets globals
-  CalcPixelParameters(img.width, img.height);
+  // CalcPixelParameters(bgnd.width, bgnd.height);
   
   // Iterate over the active size of the image pixel-by-pixel
   // For each pixel, determine the triangular coordinate
-  for (int j = startHeight; j < endHeight; j++) {
-    for (int i = startWidth; i < endWidth; i++) {
-      Coord coord = GetPixelCoord(i-startWidth, j-startHeight);
+  for (int j = 0; j < bgnd.height; j++) {
+    for (int i = 0; i < bgnd.width; i++) {
+      Coord coord = GetPixelCoord(i, j, bgnd.height, bgnd.width);
       if (coord.outofbounds()) continue;
       
       // Pull pixel location and color from picture
-      int imageloc = i + j*img.width;
-      RGBColor rgb = new RGBColor(red(img.pixels[imageloc]),
-                       green(img.pixels[imageloc]),
-                        blue(img.pixels[imageloc]));
+      int imageloc = i + j*bgnd.width;
+      RGBColor rgb = new RGBColor(red(bgnd.pixels[imageloc]),
+                       green(bgnd.pixels[imageloc]),
+                        blue(bgnd.pixels[imageloc]));
       
       // Stuff the pixel's rgb color data into the proper hex bin
       if (hsvcorrect) {   // Do we correct for hsv?
@@ -639,9 +685,9 @@ void CalcPixelParameters(float imageWidth, float imageHeight) {
 
 // Find the triangle coordinate of an x,y point
 
-Coord GetPixelCoord(int x, int y) {
-  float pix_height = imgHeight / TRI_GEN;
-  float pix_width = imgWidth / (TRI_GEN*2);
+Coord GetPixelCoord(int x, int y, int imageHeight, int imageWidth) {
+  float pix_height = imageHeight / TRI_GEN;
+  float pix_width = imageWidth / (TRI_GEN*2);
   
   // y is easy. Flip in direction between processing and triangles have different 0's
   int coord_y = (int)(y / pix_height);
@@ -1113,7 +1159,10 @@ void movePixelsToBuffer() {
         // Get rgb values from binned hex
         Coord coord = new Coord(x+y,y);
         if (coord.outofbounds()) continue;  // Memory fault
-        int pix = GetLightFromCoord(coord.x,coord.y,0);  // Fix
+        int pix = GetLightFromCoord(coord.x,coord.y,0);  // Works!
+        if (!isPointUp(getBigX(tri),getBigY(tri))) {  // Gotta rotate the image for point down triangles
+          pix = rotateclock[pix];
+        }
         RGBColor rgb = pixelarray.Pixels[get_index(coord)].pixcolor;
         int r = (int)rgb.r;
         int g = (int)rgb.g;
@@ -1140,7 +1189,7 @@ void sendDataToLights() {
     BigTri = 0;
     
     for (Strip strip : strips) {      
-      for (pixel = 0; pixel < NUM_PIXELS; pixel++) {
+      for (pixel = 0; pixel < (TRI_GEN*TRI_GEN); pixel++) {
          if (hasChanged(BigTri,pixel)) {
            strip.setPixel(getPixelBuffer(BigTri,pixel), pixel);
          }
@@ -1162,6 +1211,7 @@ void initializeColorBuffers() {
   }
   sendDataToLights();
   pushColorBuffer();
+  println("go!");
 }
 
 void forceBlack() {
@@ -1170,7 +1220,10 @@ void forceBlack() {
       curr_buffer[t][p][0] = 100;
       curr_buffer[t][p][1] = 100;
       curr_buffer[t][p][2] = 100;
-      setPixelBuffer(t, p, 0,0,0);
+      setPixelBuffer(t, p, 0,0,0);  // Lights
+    }
+    for (int p = 0; p < TRI_GEN*TRI_GEN; p++) {
+      triGrid[t].setCellColor(color(0,0,0), p);  // Simulator
     }
   }
   sendDataToLights();
