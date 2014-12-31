@@ -65,7 +65,7 @@ class ShowRunner(threading.Thread):
                 print "ShowRunner shutting down"
             elif msg == "clear":
                 self.clear()
-                time.sleep(2)
+                time.sleep(0.2)
             elif msg.startswith("run_show:"):
                 self.running = True
                 show_name = msg[9:]
@@ -119,7 +119,7 @@ class ShowRunner(threading.Thread):
             print "choosing random show"
             s = self.randseq.next()
 
-        self.clear()
+        self.queue.put("clear")
         self.prev_show = self.show
 
         self.show = s(self.model)
@@ -254,13 +254,14 @@ class TriWeb(object):
 
     @cherrypy.expose
     def next_show(self, show_name=None):
+
         self.runner.next_show(show_name)
         ret_html = "<a href=/>HOME</a>"
         return ret_html + self.redirect_home_html
 
     @cherrypy.expose
     def show_time(self, show_time=float(180)):
-        self.runner.clear()
+
         self.runner.max_show_time = float(show_time)
         ret_html = "this show will run for %s seconds (including time it's already run)" % show_time
         return ret_html + self.redirect_home_html

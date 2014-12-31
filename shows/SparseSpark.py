@@ -8,13 +8,13 @@ class SparseSparkRed(object):
         self.strobers = []
         self.speed = 0.1
         self.num_strobers_lower = 10
-        self.num_strobers_upper = randint(25, 50)
+        self.num_strobers_upper = randint(35, 70)
         self.num_strobers = 14
         self.growing = True
 
     def next_frame(self):
         while (True):
-            if len(self.strobers) < self.num_strobers:
+            while len(self.strobers) < self.num_strobers:
                 self.strobers.append(self.new_fader())
 
             for f in self.strobers:
@@ -29,9 +29,9 @@ class SparseSparkRed(object):
     def remove(self, strober):
         self.tri.set_cell(strober.pos, (0, 0, 0))
         self.strobers.remove(strober)
-        
+
         if self.growing == True:
-            self.num_strobers += 1
+            self.num_strobers += randint(1, 3)
             if self.num_strobers > self.num_strobers_upper:
                 self.growing = False
         else:
