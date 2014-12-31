@@ -9,3 +9,9 @@ Software for LED triangles
 - $ python go.py
 - visit http://localhost:9991/
 - win
+
+
+
+cherrypy the web framework isn't dying gracefully with a ctr+c, so when you change the codes to restart the webserver:
+- ctrl + zz
+- $ kill -9 %1 && ps && python go.py
