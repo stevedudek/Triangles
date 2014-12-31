@@ -233,6 +233,7 @@ class TriWeb(object):
         self.app = app
         self.runner = self.app.runner
         self.show_names = [s[0] for s in shows.load_shows()]
+        self.redirect_home_html = "<script>setTimeout(function(){window.location='/'},3000)</script>"
         pass
 
     @cherrypy.expose
@@ -252,14 +253,14 @@ class TriWeb(object):
     @cherrypy.expose
     def next_show(self, show_name=None):
         self.runner.next_show(show_name)
-        ret_html = "<a href=/>HOME</a><script>setTimeout(function(){window.location='/'},3000)</script>"
-        return ret_html
+        ret_html = "<a href=/>HOME</a>"
+        return ret_html + self.redirect_home_html
 
     @cherrypy.expose
     def show_time(self, show_time=float(180)):
         self.runner.max_show_time = float(show_time)
-        ret_html = "next show will be %s seconds <script>setTimeout(function(){window.location='/'},3000)</script>" % show_time
-        return ret_html
+        ret_html = "this show will run for %s seconds (including time it's already run)" % show_time
+        return ret_html + self.redirect_home_html
 
 
     @cherrypy.expose
