@@ -207,12 +207,17 @@ class TriangleServer(object):
                 traceback.print_exc()
 
     def go_headless(self, app):
-        "Run with web interface"
-#        print "Running without web interface"
-#        try:
-#            while True:
-#                time.sleep(999) # control-c breaks out of time.sleep
+      print "Running without web interface"
+      try:
+        while True:
+          time.sleep(999) # control-c breaks out of time.sleep
+      except KeyboardInterrupt:
+          print "Exiting on keyboard interrupt"
+          self.stop()
 
+
+    def go_web(self, app):
+        "Run with web interface"
         port = 9991
         config = {
             'global': {
@@ -220,13 +225,10 @@ class TriangleServer(object):
                     'server.socket_port' : port
                     }
                 }
+
         cherrypy.quickstart(TriWeb(app),
                 '/',
                 config=config)
-#        except KeyboardInterrupt:
-#            print "Exiting on keyboard interrupt"
-
-        self.stop()
 
 class TriWeb(object):
     def __init__(self, app):
@@ -258,6 +260,7 @@ class TriWeb(object):
 
     @cherrypy.expose
     def show_time(self, show_time=float(180)):
+        self.runner.clear()
         self.runner.max_show_time = float(show_time)
         ret_html = "this show will run for %s seconds (including time it's already run)" % show_time
         return ret_html + self.redirect_home_html
@@ -303,7 +306,7 @@ if __name__=='__main__':
     app = TriangleServer(full_triangles, args)
     try:
         app.start() # start related service threads
-        app.go_headless(app)
+        app.go_web(app)
 
     except Exception, e:
         print "Unhandled exception running Triangles!"
