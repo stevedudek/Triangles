@@ -85,11 +85,13 @@ int COLOR_STATE = 0;  // no enum types in processing. Messy
 
 // Count down globals
 int number_counter = 60;  // Starting seconds
+boolean whiteBlackFlag = false;
 float begin_scroll = 0.4;
 float end_scroll = 1.6;
 boolean count_down = false;  // Don't change this
 long savedTime;
 String filename = "11.jpg";
+int flipRate = 1000;
 
 boolean vertcenter = true;         // Do you want to take a vertical center slice of the image?
 boolean horizcenter = false;        // Do you want to take a horizontal center slice of the image?
@@ -243,6 +245,11 @@ class PixelArray {
     for (int i = 0; i < size; i++) StuffPixelWithColor(i, black);
   }
   
+  void whiteAllPixels() {
+    RGBColor black = new RGBColor(0,0,0);
+    for (int i = 0; i < size; i++) StuffPixelWithColor(i, black);
+  }
+  
   void StuffPixelWithColor(int index, RGBColor rgb) {
     if (index < 0 || index >= size) return;
     
@@ -320,15 +327,16 @@ void draw() {
       long currTime = millis();
       long diffTime = currTime - savedTime;
       
-      if (diffTime > 1000) {  // 1 full second has elapsed]
+      if (diffTime > flipRate) {  // 1 full second has elapsed]
 
         savedTime = currTime + 1000 - diffTime;
         diffTime -= 1000;
         
        
         number_counter -= 1;
-        if (number_counter < 0) {  // Reached the end
+        if (number_counter <= 0) {  // Reached the end
           number_counter = 0;
+          flipRate = 420;
   //        count_down = false;  // Stop counting
   //        forceBlack();  // Turn off triangles
         }
@@ -363,6 +371,7 @@ void BlendImages(int number, float scroll_amount) {
     img.text(number, 5, 65);
   } else {
     img.text("\\/", 5, 65);  // At the end
+    img.background(255);
   }
   img.endDraw();
   img.loadPixels();
