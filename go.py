@@ -10,6 +10,8 @@ import triangle
 import shows
 import util
 
+import cherrypy
+
 class ShowRunner(threading.Thread):
     def __init__(self, model, queue, max_showtime=1000):
         super(ShowRunner, self).__init__(name="ShowRunner")
@@ -117,7 +119,7 @@ class ShowRunner(threading.Thread):
             print "choosing random show"
             s = self.randseq.next()
 
-        # self.clear()
+        self.clear()
         self.prev_show = self.show
 
         self.show = s(self.model)
@@ -204,18 +206,69 @@ class TriangleServer(object):
                 print "Exception stopping Triangles!"
                 traceback.print_exc()
 
-    def go_headless(self):
-        "Run without the web interface"
-        print "Running without web interface"
-        try:
-            while True:
-                time.sleep(999) # control-c breaks out of time.sleep
-        except KeyboardInterrupt:
-            print "Exiting on keyboard interrupt"
+    def go_headless(self, app):
+        "Run with web interface"
+#        print "Running without web interface"
+#        try:
+#            while True:
+#                time.sleep(999) # control-c breaks out of time.sleep
+
+        port = 9991
+        config = {
+            'global': {
+                    'server.socket_host': '0.0.0.0',
+                    'server.socket_port' : port
+                    }
+                }
+        cherrypy.quickstart(TriWeb(app),
+                '/',
+                config=config)
+#        except KeyboardInterrupt:
+#            print "Exiting on keyboard interrupt"
 
         self.stop()
 
-    
+class TriWeb(object):
+    def __init__(self, app):
+        self.app = app
+        self.runner = self.app.runner
+        self.show_names = [s[0] for s in shows.load_shows()]
+        pass
+
+    @cherrypy.expose
+    def index(self):
+        ret_html = "Shows:<br>"
+        for i in self.show_names:
+            ret_html += "<a href=/next_show?show_name=%s > %s </a><br>" % (i,i)
+
+        ret_html += """
+        <form action="/show_time">
+            <input type='text' name='show_time'></input>
+            <input type='submit' value='set show time'></input>
+        </form>
+        """
+        return ret_html
+
+    @cherrypy.expose
+    def next_show(self, show_name=None):
+        self.runner.next_show(show_name)
+        ret_html = "<a href=/>HOME</a><script>setTimeout(function(){window.location='/'},3000)</script>"
+        return ret_html
+
+    @cherrypy.expose
+    def show_time(self, show_time=float(180)):
+        self.runner.max_show_time = float(show_time)
+        ret_html = "next show will be %s seconds <script>setTimeout(function(){window.location='/'},3000)</script>" % show_time
+        return ret_html
+
+
+    @cherrypy.expose
+    def kill(self):
+        cherrypy.engine.exit()
+        self.app.stop()
+        import sys
+        sys.exit()
+
 if __name__=='__main__':
     import argparse
     parser = argparse.ArgumentParser(description='Baaahs Light Control')
@@ -241,7 +294,7 @@ if __name__=='__main__':
     sim_port = 4444
 
     print "Using Triangle Simulator at %s:%d" % (sim_host, sim_port)
-    
+
     from model.simulator import SimulatorModel
     model = SimulatorModel(sim_host, port=sim_port)
     full_triangles = triangle.load_triangles(model)
@@ -249,7 +302,7 @@ if __name__=='__main__':
     app = TriangleServer(full_triangles, args)
     try:
         app.start() # start related service threads
-        app.go_headless()
+        app.go_headless(app)
 
     except Exception, e:
         print "Unhandled exception running Triangles!"

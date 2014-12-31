@@ -56,7 +56,11 @@ The USB Stick needs a text file on it named pixel.rc . There are copies of this 
 
 ### Router
 
-Plug the router into a power strip with the included wallwart adapter.
+Plug the router into a power strip with the included wallwart adapter. Your computer needs to talk to the wired router with these settings:
+
+![image](pixelpusher-net.jpeg)
+
+If you are set up right, you should be able to type "ping 10.1.0.20" from the Terminal and see a response
 
 ### Computer
 
@@ -104,7 +108,7 @@ and a second array for the connectors:
 
 Update the values like you did for triangle.py and save the changes.
 
-**Down the same array update for the ScrollingCountDown.pde!**
+**Do the same array update for the ScrollingCountDownLonger.pde!**
 
 ### Coordinate
 
@@ -128,7 +132,11 @@ If you stare at the sharp corner where the wire comes in, do the lights from the
 
 ### Checking
 
-When you run the simulator (next), do the Triangles light up like they do on the screen? If they don't, you misread the connections.
+Run this processing sketch to display the simulator. Click the Toggle Labels box on the lower left corner to bring on the red guides like these:
+
+![image](guide_example.png)
+
+Do the guides light up the corners with the wire connection and do the guides run in the correct direction?
 
 
 ## Running the Software

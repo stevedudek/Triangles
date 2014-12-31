@@ -25,12 +25,12 @@ int numBigTri = 6;  // Number of Big Triangles
 
 // Relative coordinates for the Big Triangles
 int[][] BigTriCoord = {
-  {0,0},  // Strip 1
-  {0,1},  // Strip 2
-  {2,0},  // Strip 3
-  {2,1},  // Strip 4
-  {1,0},  // Strip 5
-  {1,1}   // Strip 6
+  {2,0},  // Strip 1
+  {2,1},  // Strip 2
+  {4,0},  // Strip 3
+  {4,1},  // Strip 4
+  {6,0},  // Strip 5
+  {6,1}   // Strip 6
 };
 
 // Matrix listing where the connector attaches physically
@@ -41,12 +41,12 @@ int[][] BigTriCoord = {
 // as viewed from corner
 // 'L' = Left, 'R' = Right
 char[][] connectors = {
-  {'L','R'},  // Strip 1
-  {'L','R'},  // Strip 2
-  {'L','R'},  // Strip 3
-  {'L','R'},  // Strip 4
-  {'L','R'},  // Strip 5
-  {'L','R'}   // Strip 6
+  {'C','L'},  // Strip 1
+  {'R','R'},  // Strip 2
+  {'C','L'},  // Strip 3
+  {'R','R'},  // Strip 4
+  {'C','L'},  // Strip 5
+  {'L','L'}   // Strip 6
 };
 
 class TestObserver implements Observer {
@@ -300,37 +300,37 @@ void setup() {
 void draw() {
   background(200);
   
-  drawBottomControls();
+  drawBottomControls();  // For the Simulator
   
-  // Draw each grid
+  // Draw each grid - for the Simulator
   for (int i = 0; i < numBigTri; i++) {
     triGrid[i].draw();
   }
-  // Draw a bold frame around each grid
+  // Draw a bold frame around each grid - for the Simulator
   if (TILING) {
     for (int i = 0; i < numBigTri; i++) {
       drawBigFrame(i);
     }
   }
   
-  if (count_down) {
+  if (count_down) {  // boolean: are we counting?
     if (number_counter >= 0) {  // We're counting!
       long currTime = millis();
       long diffTime = currTime - savedTime;
       
-      if (diffTime > 1000) {  // 1 second
+      if (diffTime > 1000) {  // 1 full second has elapsed
         savedTime = currTime + 1000 - diffTime;
         diffTime -= 1000;
         number_counter -= 1;
-        if (number_counter < 0) {
-          count_down = false;
-          forceBlack();
+        if (number_counter < 0) {  // Reached the end
+          count_down = false;  // Stop counting
+          forceBlack();  // Turn off triangles
         }
         if (number_counter <= 11 && number_counter >= 0) {
-          filename = number_counter + ".jpg";
+          filename = number_counter + ".jpg";  // 11.jpg, 10.jpg, etc.
         }
       }
-      if (number_counter < 12 && count_down) {  // We're displaying!
+      if (number_counter <= 11 && count_down) {  // Always display
         BlendImages(filename, calc_scroll_amount(diffTime));
         DumpImageIntoPixels();
         movePixelsToBuffer();
@@ -412,7 +412,7 @@ void DumpImageIntoPixels() {
                        green(bgnd.pixels[imageloc]),
                         blue(bgnd.pixels[imageloc]));
       
-      // Stuff the pixel's rgb color data into the proper hex bin
+      // Stuff the pixel's rgb color data into the proper tri bin
       if (hsvcorrect) {   // Do we correct for hsv?
         RGBColor hsv = RGBtoHSV(rgb);  // Yes, rgb -> hsv
         pixelarray.StuffPixelWithColor(get_index(coord), hsv);
@@ -827,6 +827,15 @@ boolean IsCoordinGrid(int x, int y, int grid) {
   if (!isPointUp(getBigX(grid),getBigY(grid))) {
     y = TRI_GEN - y - 1;
   }
+  
+  return (IsCoordinSimpleGrid(x,y));
+}
+
+//
+// IsCoordinSimpleGrid
+//
+// Checks to see whether (x,y) is on a (0,0) grid
+boolean IsCoordinSimpleGrid(int x, int y) {
   // Check y-row first
   if (y < 0 || y >= TRI_GEN) {
    return (false);  // y is out of bounds
@@ -835,7 +844,6 @@ boolean IsCoordinGrid(int x, int y, int grid) {
   if (x < y || x >= y + rowWidth(y)) {
     return (false);  // x is out of bounds
   }
-  
   return (true);
 }
 
@@ -846,7 +854,7 @@ boolean IsCoordinGrid(int x, int y, int grid) {
 
 int GetLightFromCoord(int x, int y, int grid) {
   if (IsCoordinGrid(x,y,grid) == false) {
-    print(x,y,grid);
+    println(x,y,grid);
     return (NONE);
   }
   
@@ -1155,23 +1163,35 @@ void drawTriangle(int x, int y, int size, boolean up) {
 void movePixelsToBuffer() {
   for (int y=0; y<TRI_GEN; y++) {  // rows
     for (int x=0; x<rowWidth(y); x++) {  // columns
-      for (int tri=0; tri<numBigTri; tri++) {
-        // Get rgb values from binned hex
-        Coord coord = new Coord(x+y,y);
-        if (coord.outofbounds()) continue;  // Memory fault
-        int pix = GetLightFromCoord(coord.x,coord.y,0);  // Works!
-        if (!isPointUp(getBigX(tri),getBigY(tri))) {  // Gotta rotate the image for point down triangles
-          coord.y = TRI_GEN-y-1;
-          coord.x = (TRI_GEN*2)-x-y-1;
-          pix = rotatecounter[pix];
-        }
-        RGBColor rgb = pixelarray.Pixels[get_index(coord)].pixcolor;
+      for (int grid=0; grid<numBigTri; grid++) {  // Big Triangles
+        // Does Big Triangle point down?
+        boolean pointDown = !isPointUp(getBigX(grid),getBigY(grid));
+        
+        // Get rgb values from binned tri
+        Coord simple_coord = new Coord(x+y,y);
+        if (simple_coord.outofbounds()) continue;  // Otherwise memory fault
+        
+        if (pointDown) simple_coord.y = TRI_GEN - y - 1;  // Flip image
+        
+        // Convert to big-tri coordinates
+        Coord complex_coord = new Coord(simple_coord.x + (getBigX(grid) * TRI_GEN),
+                                        simple_coord.y + (getBigY(grid) * TRI_GEN) );
+        
+        // Figure out the pixel number
+        int pix = GetLightFromCoord(complex_coord.x,complex_coord.y,grid);
+        
+        if (pix == NONE) continue;
+        
+        // Flip image back for downward grids
+        if (pointDown) simple_coord.y = TRI_GEN-y-1;
+        
+        RGBColor rgb = pixelarray.Pixels[get_index(simple_coord)].pixcolor;
         int r = (int)rgb.r;
         int g = (int)rgb.g;
         int b = (int)rgb.b;
         
-        setPixelBuffer(tri, pix, r,g,b);  // Lights
-        triGrid[tri].setCellColor(color(r,g,b), pix);  // Simulator 
+        setPixelBuffer(grid, pix, r,g,b);  // Lights
+        triGrid[grid].setCellColor(color(r,g,b), pix);  // Simulator 
       }
     }
   }

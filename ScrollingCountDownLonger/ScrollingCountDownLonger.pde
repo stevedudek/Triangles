@@ -1,32 +1,25 @@
-/*
-
-  Triangle Simulator and Lighter
-  
-  1. Simulator: draws triangles on the monitor
-  2. Lighter: sends data to the lights
-  
-  Includes Tiling of
-  Multiple Big Triangle Grids
-  
-  12/8/14
-  
-  Built on glorious Hex Simulator
-  
-  Main parameter is triangle TRI_GEN, or number of triangles on the base
-  TRI_GEN is fixed at 12 for 144 total triangles.
-  
-  x,y coordinates are weird for each triangle, but selected to make
-  both neighbors and linear movement easier. Turn on the coordinates
-  to see the system.
-  
-  Number of Big Triangles set by numBigTri. Each Big Triangles needs
-  an (x,y) coordinate and a (L,R) connector designation. 
-  
-  Function included to translate x,y coordinates
-  into which number light on a strand. This function likely will be
-  moved into the python show runner.
-  
-*/
+//
+// "Triangulates" a jpeg image
+//
+// How to use:
+//
+// Put a jpeg (or jpg) image of your choice in the directory with this sketch
+// Point the sketch to your image by setting below 'String filename = "your_image.jpg";'
+//
+// Changing the vertcenter and horizcenter toggles will select either the center or top of the image
+//
+// hsv correction leads to some odd colored artifacts.
+//
+// This sketch...
+//
+// First, crops the image to fit the ratio of the hex array (1:1.15 depending on flat or pointy top)
+// Then, averages the r,g,b values within each hex
+//
+// Version 4 converts each r,g,b to h,s,v; averages those; and re-converts the average h,s,v back to r,g,b
+// Version 5 corrects for rhombal coordinates. It also includes a toggle for hsv correction.
+// Version 6 is written in proper Java OOP format
+// Version 7 dumps the rgb coordinate output to a text file
+//
 
 int numBigTri = 6;  // Number of Big Triangles
 
@@ -55,21 +48,6 @@ char[][] connectors = {
   {'C','R'},  // Strip 5
   {'L','L'}   // Strip 6
 };
-
-import com.heroicrobot.dropbit.registry.*;
-import com.heroicrobot.dropbit.devices.pixelpusher.Pixel;
-import com.heroicrobot.dropbit.devices.pixelpusher.Strip;
-import com.heroicrobot.dropbit.devices.pixelpusher.PixelPusher;
-import com.heroicrobot.dropbit.devices.pixelpusher.PusherCommand;
-
-import processing.net.*;
-import java.util.*;
-import java.util.regex.*;
-
-// network vars
-int port = 4444;
-Server _server; 
-StringBuffer _buf = new StringBuffer();
 
 class TestObserver implements Observer {
   public boolean hasStrips = false;
@@ -103,14 +81,27 @@ int DRAW_LABELS = 2;
 boolean TILING = true;
 
 int BRIGHTNESS = 100;  // A percentage
-
 int COLOR_STATE = 0;  // no enum types in processing. Messy
+
+// Count down globals
+int number_counter = 60;  // Starting seconds
+float begin_scroll = 0.4;
+float end_scroll = 1.6;
+boolean count_down = false;  // Don't change this
+long savedTime;
+String filename = "11.jpg";
+
+boolean vertcenter = true;         // Do you want to take a vertical center slice of the image?
+boolean horizcenter = false;        // Do you want to take a horizontal center slice of the image?
+boolean printnumoutput = false;    // Do you want the r,g,b values printed out
+boolean hsvcorrect = false;         // Do you want to hsv correct the colors?
 
 // How many triangles on the base
 int TRI_GEN = 12;
-int NUM_PIXELS = TRI_GEN * TRI_GEN;
+int ROW_WIDTH = TRI_GEN * 2;
+int NUM_PIXELS = TRI_GEN * ROW_WIDTH;
 
-// Color buffers: [BigTri][Pixel][r,g,b]
+// Color buffers: [BigTri][Pixel][r,g,b] 
 // Two buffers permits updating only the lights that change color
 // May improve performance and reduce flickering
 int[][][] curr_buffer = new int[numBigTri][NUM_PIXELS][3];
@@ -120,6 +111,7 @@ int[][][] next_buffer = new int[numBigTri][NUM_PIXELS][3];
 int SCREEN_SIZE = 800;  // square screen
 float TRI_SIZE = (SCREEN_SIZE - 20) / (TRI_GEN * grid_width());  // Scale triangles to fit screen
 float TRI_HEIGHT = TRI_SIZE * 0.866;
+float widthheight = 1 / 0.866;  // Width-to-heigh ratio for an equilateral triangle
 int BASE = (int)(TRI_GEN * TRI_SIZE);  // Width of big triangle
 int BIG_HEIGHT = (int)triHeight(BASE);  // Height of big triangle
 int SCREEN_WIDTH = (int)(BASE * grid_width()) + 20;  // Width + a little
@@ -160,10 +152,121 @@ int[] rotatecounter = {
   23,21,20,
   22 };
 
+import com.heroicrobot.dropbit.registry.*;
+import com.heroicrobot.dropbit.devices.pixelpusher.Pixel;
+import com.heroicrobot.dropbit.devices.pixelpusher.Strip;
+import com.heroicrobot.dropbit.devices.pixelpusher.PixelPusher;
+import com.heroicrobot.dropbit.devices.pixelpusher.PusherCommand;
+
+import processing.net.*;
+import java.util.*;
+import java.util.regex.*;
+
+
+// Cropped part of the image
+int startWidth, endWidth, imgWidth, startHeight, endHeight, imgHeight;  
+
+PGraphics img;  // the number picture
+PImage bgnd;  // the black background
+
+class Coord {
+  public int x, y;
+  
+  Coord(int x, int y) {
+    this.x = x;
+    this.y = y;
+  }
+  
+  boolean outofbounds() {  // is coordinate off of the array?
+    if (x < 0 || x >= TRI_GEN * 2 || y < 0 || y >= TRI_GEN) {
+      return(true);  // Would be a dangerous access of memory. Crash!
+    } else {
+      return(false);
+    }
+  }
+  
+  boolean isOnTriangle() {  // is coordinate on the main triangle grid?
+    if (y < 0 || y >= TRI_GEN || x < y || x >= (ROW_WIDTH - y -1)) {
+      return false;
+    } else {
+      return true;
+    }
+  }
+}
+
+class RGBColor {
+  public float r, g, b;
+  
+  RGBColor(float r, float g, float b) {
+    this.r = r;
+    this.g = g;
+    this.b = b;
+  }
+}
+
+class Pixel {
+  public int numitems;
+  public RGBColor pixcolor;
+  
+  Pixel() {
+    this.numitems = 0;
+  }
+}
+
+class PixelArray {
+  public int size;
+  public Pixel[] Pixels;
+  
+  PixelArray(int size) {
+    this.size = size;
+    this.Pixels = new Pixel[size];
+    for (int i = 0; i < size; i++) {
+      Pixels[i] = new Pixel();
+    }
+    BlackAllPixels();
+  }
+  
+  void EmptyAllPixels() {
+    for (int i = 0; i < size; i++) EmptyPixel(i);
+  }
+  
+  void EmptyPixel(int index) {
+    if (index < 0 || index >= size) {
+       return;
+    } else {
+      Pixels[index].numitems = 0;
+    }
+  }
+  
+  void BlackAllPixels() {
+    RGBColor black = new RGBColor(0,0,0);
+    for (int i = 0; i < size; i++) StuffPixelWithColor(i, black);
+  }
+  
+  void StuffPixelWithColor(int index, RGBColor rgb) {
+    if (index < 0 || index >= size) return;
+    
+    int numdata = Pixels[index].numitems;
+    if (numdata == 0) {  // First value in pixel. Stuff all of it.
+      this.Pixels[index].pixcolor = new RGBColor(rgb.r, rgb.g, rgb.b);
+    } else {  // Already values in hex. Do a weighted average with the new value.
+      this.Pixels[index].pixcolor = new RGBColor(
+        (rgb.r + (this.Pixels[index].pixcolor.r*numdata))/(numdata+1),
+        (rgb.g + (this.Pixels[index].pixcolor.g*numdata))/(numdata+1),
+        (rgb.b + (this.Pixels[index].pixcolor.b*numdata))/(numdata+1));
+    }
+    this.Pixels[index].numitems++;
+  }
+}
+
+// The main hex structure
+PixelArray pixelarray;
+
 void setup() {
   size(SCREEN_WIDTH, SCREEN_HEIGHT + 50); // 50 for controls
   stroke(0);
-  fill(255,255,0);
+//  fill(255,255,0);
+  fill(253,245,111);
   
   frameRate(10); // default 60 seems excessive
   
@@ -186,30 +289,154 @@ void setup() {
   
   initializeColorBuffers();  // Stuff with zeros (all black)
   
-  _server = new Server(this, port);
-  println("server listening:" + _server);
+  //_server = new Server(this, port);
+  //println("server listening:" + _server);
+  
+  // Image handling
+  pixelarray = new PixelArray(NUM_PIXELS);
+  img = createGraphics(100, 87);
+  
+  forceBlack();
 }
 
 void draw() {
   background(200);
   
-  drawBottomControls();
+  drawBottomControls();  // For the Simulator
   
-  // Draw each grid
+  // Draw each grid - for the Simulator
   for (int i = 0; i < numBigTri; i++) {
     triGrid[i].draw();
   }
-  // Draw a bold frame around each grid
+  // Draw a bold frame around each grid - for the Simulator
   if (TILING) {
     for (int i = 0; i < numBigTri; i++) {
       drawBigFrame(i);
     }
   }
   
-  pollServer();        // Get messages from python show runner
-  if (DRAW_LABELS == 0) drawGuides();  // Draw the red guides
-  sendDataToLights();  // Dump data into lights
-  pushColorBuffer();   // Push the frame buffers
+  if (count_down) {  // boolean: are we counting?
+    if (number_counter >= 0) {  // We're counting!
+      long currTime = millis();
+      long diffTime = currTime - savedTime;
+      
+      if (diffTime > 1000) {  // 1 full second has elapsed]
+
+        savedTime = currTime + 1000 - diffTime;
+        diffTime -= 1000;
+        
+       
+        number_counter -= 1;
+        if (number_counter < 0) {  // Reached the end
+          number_counter = 0;
+  //        count_down = false;  // Stop counting
+  //        forceBlack();  // Turn off triangles
+        }
+      }
+      if (count_down) {  // Always display
+        BlendImages(number_counter, calc_scroll_amount(diffTime));
+        DumpImageIntoPixels();
+        movePixelsToBuffer();
+        sendDataToLights();
+        pushColorBuffer();
+        pixelarray.EmptyAllPixels();
+      }
+    }
+  }
+}
+
+float calc_scroll_amount(long time) {
+  if (time > 1000) time = 1000;
+  return (begin_scroll + ((end_scroll - begin_scroll) * time / 1000));
+}
+
+void BlendImages(int number, float scroll_amount) {
+  // Load number picture
+  img.beginDraw();
+  img.background(0);
+  if (number < 10) {
+    img.textSize(70);  // Make 1-9 bigger
+  } else {
+    img.textSize(50);  // 10-60 smaller
+  }
+  if (number != 0) {
+    img.text(number, 5, 65);
+  } else {
+    img.text("\\/", 5, 65);  // At the end
+  }
+  img.endDraw();
+  img.loadPixels();
+  
+  // Figure out the cropped dimensions of the image
+  CalcPixelParameters(img.width, img.height);
+  int numberHeight = endHeight - startHeight;
+  int backWidth = (int)(numberHeight / 0.866);
+  
+  // Create the screen image and fill it with all black
+  bgnd = createImage(backWidth, numberHeight, RGB);
+  bgnd.loadPixels();
+  
+  for (int i = 0; i < bgnd.pixels.length; i++) {
+    bgnd.pixels[i] = color(0, 0, 0);  // Black
+  }
+  // Now blend
+  if (scroll_amount < 1.0) {  // Number is coming in from left of screen
+    int crop_start = (int)((endWidth-startWidth)*(1.0 - scroll_amount));
+    
+    bgnd.blend(img,  // src
+      startWidth + crop_start,  //sx
+      startHeight,  // sy
+      (endWidth - startWidth) - crop_start,  // sw
+      numberHeight,  // sh
+      0,  // dx
+      0,  // dy
+      (endWidth - startWidth) - crop_start,  // dw
+      bgnd.height,  // dh
+      LIGHTEST);
+  } else {  // Number is leaving to right of screen
+    int crop_start = (int)(bgnd.width * (scroll_amount - 1.0));
+    bgnd.blend(img,  // src
+      0,  //sx
+      startHeight,  // sy
+      bgnd.width - crop_start,  // sw
+      numberHeight,  // sh
+      crop_start,  // dx
+      0,  // dy
+      bgnd.width - crop_start,  // dw
+      bgnd.height,  // dh
+      LIGHTEST);
+  }
+  bgnd.updatePixels();
+}
+
+void DumpImageIntoPixels() {
+
+  // Figure out the cropped dimensions of the image
+  // Figure out the size of each little hex. Sets globals
+  // CalcPixelParameters(bgnd.width, bgnd.height);
+  
+  // Iterate over the active size of the image pixel-by-pixel
+  // For each pixel, determine the triangular coordinate
+  for (int j = 0; j < bgnd.height; j++) {
+    for (int i = 0; i < bgnd.width; i++) {
+      Coord coord = GetPixelCoord(i, j, bgnd.height, bgnd.width);
+      if (coord.outofbounds()) continue;
+      
+      // Pull pixel location and color from picture
+      int imageloc = i + j*bgnd.width;
+      RGBColor rgb = new RGBColor(red(bgnd.pixels[imageloc]),
+                       green(bgnd.pixels[imageloc]),
+                        blue(bgnd.pixels[imageloc]));
+      
+      // Stuff the pixel's rgb color data into the proper tri bin
+      if (hsvcorrect) {   // Do we correct for hsv?
+        RGBColor hsv = RGBtoHSV(rgb);  // Yes, rgb -> hsv
+        pixelarray.StuffPixelWithColor(get_index(coord), hsv);
+      } else {
+        pixelarray.StuffPixelWithColor(get_index(coord), rgb);
+      }      
+    }
+  }
 }
 
 void drawCheckbox(int x, int y, int size, color fill, boolean checked) {
@@ -237,7 +464,7 @@ void drawBottomControls() {
   stroke(0);
   fill(255);
   // Checkbox is always unchecked; it is 3-state
-  rect(20,SCREEN_HEIGHT+10,20,20);  // label checkbox
+  drawCheckbox(20,SCREEN_HEIGHT+10,20, color(255,255,255), count_down);
   
   rect(200,SCREEN_HEIGHT+4,15,15);  // minus brightness
   rect(200,SCREEN_HEIGHT+22,15,15);  // plus brightness
@@ -256,13 +483,13 @@ void drawBottomControls() {
   textAlign(LEFT);
   PFont f = createFont("Helvetica", 12, true);
   textFont(f, 12);  
-  text("Toggle Labels", 50, SCREEN_HEIGHT+25);
+  text("Start/Stop", 50, SCREEN_HEIGHT+25);
   
   text("-", 190, SCREEN_HEIGHT+16);
   text("+", 190, SCREEN_HEIGHT+34);
-  text("Brightness", 225, SCREEN_HEIGHT+25);
+  text("Seconds", 225, SCREEN_HEIGHT+25);
   textFont(f, 20);
-  text(BRIGHTNESS, 150, SCREEN_HEIGHT+28);
+  text(number_counter, 150, SCREEN_HEIGHT+28);
   
   textFont(f, 12);
   text("None", 305, SCREEN_HEIGHT+16);
@@ -282,7 +509,8 @@ void mouseClicked() {
   //println("click! x:" + mouseX + " y:" + mouseY);
   if (mouseX > 20 && mouseX < 40 && mouseY > SCREEN_HEIGHT+10 && mouseY < SCREEN_HEIGHT+30) {
     // clicked draw labels button
-    DRAW_LABELS = (DRAW_LABELS + 1) % 3;
+    count_down = !count_down;
+    if (count_down) savedTime = millis();
    
   }  else if (mouseX > 200 && mouseX < 215 && mouseY > SCREEN_HEIGHT+4 && mouseY < SCREEN_HEIGHT+19) {
     // Bright down checkbox  
@@ -319,6 +547,209 @@ void mouseClicked() {
   }  else if (mouseX > 380 && mouseX < 395 && mouseY > SCREEN_HEIGHT+22 && mouseY < SCREEN_HEIGHT+37) {
     // All green  
     COLOR_STATE = 6;
+  }
+}
+
+// r,g,b values are from 0 to 255
+// h = [0,360], s = [0,1], v = [0,1]
+// if s == 0, then h = -1 (undefined)
+// 
+// code from http://www.cs.rit.edu/~ncs/color/t_convert.html
+
+RGBColor RGBtoHSV(RGBColor rgb)
+{
+  float h,s,v;
+  
+  float r = rgb.r/float(255);
+  float g = rgb.g/float(255);
+  float b = rgb.b/float(255);
+  
+  float MIN = min(r, min(g,b));  // min(r,g,b)
+  float MAX = max(r, max(g,b));  // max(r,g,b)
+ 
+  v = MAX;            // v
+
+  float delta = MAX - MIN;
+
+  if (MAX != 0 ) s = delta / MAX;  // s
+  else { // r = g = b = 0    // s = 0, v is undefined
+    s = 0;
+    h = -1;
+    return new RGBColor(h,s,v);
+  }
+  if( r == MAX ) h = 60.0 * ( g - b ) / delta; // between yellow & magenta
+  else {
+    if( g == MAX ) {
+      h = 120.0 + 60.0 * ( b - r ) / delta; // between cyan & yellow
+    } else {
+      h = 240.0 + 60.0 * ( r - g ) / delta;  // between magenta & cyan
+    }
+  }
+  if( h < 0 ) h += 360;
+  
+  return new RGBColor(h,s,v);
+}
+
+// r,g,b values are from 0 to 255
+// h = [0,360], s = [0,1], v = [0,1]
+// if s == 0, then h = -1 (undefined)
+//
+// code from http://www.cs.rit.edu/~ncs/color/t_convert.html
+
+RGBColor HSVtoRGB(RGBColor hsv)
+{
+  int i;
+  float r, g, b, f, p, q, t;
+  float h = hsv.r;
+  float s = hsv.g;
+  float v = hsv.b;
+  
+  if( s == 0 ) {
+    // achromatic (grey)
+    r = g = b = (v*255);
+    return new RGBColor(r,g,b);
+  }
+  
+  h /= 60;      // sector 0 to 5
+  i = floor( h );
+  f = h - i;      // factorial part of h
+  p = v * ( 1 - s );
+  q = v * ( 1 - s * f );
+  t = v * ( 1 - s * ( 1 - f ) );
+  
+  switch( i ) {
+    case 0:
+      r = v * 255;
+      g = t * 255;
+      b = p * 255;
+      break;
+    case 1:
+      r = q * 255;
+      g = v * 255;
+      b = p * 255;
+      break;
+    case 2:
+      r = p * 255;
+      g = v * 255;
+      b = t * 255;
+      break;
+    case 3:
+      r = p * 255;
+      g = q * 255;
+      b = v * 255;
+      break;
+    case 4:
+      r = t * 255;
+      g = p * 255;
+      b = v * 255;
+      break;
+    default:    // case 5:
+      r = v * 255;
+      g = p * 255;
+      b = q * 255;
+      break;
+  }
+  return new RGBColor(r,g,b); 
+}
+
+//
+// get_index
+//
+// Return the index in the pixelarray given an (x,y) coordinate
+int get_index(Coord coord) {
+  return coord.x + (coord.y * ROW_WIDTH);
+}
+
+// Calculates an individual hex's height and width
+// Calculates the cropped dimensions of the image
+
+void CalcPixelParameters(float imageWidth, float imageHeight) {
+  
+  // Figure out whether image's height or width is too big
+  // imgWidth, imgHeight are globals (boo!) that represent cropped width and height
+  if ((imageWidth / imageHeight) > widthheight) {
+    // Image is too wide - scale down
+    imgWidth = (int)(imageHeight * widthheight);
+    imgHeight = (int)imageHeight;
+  } else {
+    // Image is too tall - scale down
+    imgWidth = (int)imageWidth;
+    imgHeight = (int)(imageWidth / widthheight);
+  }
+  
+  //
+  // Figure out start and ending height and width coordinates
+  //
+  // Center is (imageWidth/2, imageHeight/2)
+  //
+  if (vertcenter) {  // Center the image vertically
+    startWidth = (int)((imageWidth / 2) - (imgWidth / 2));
+    endWidth = (int)((imageWidth / 2) + (imgWidth / 2));
+  } else {
+    startWidth = 0;  // Take just the left part of the image
+    endWidth = (int)imgWidth;
+  }
+  
+  if (horizcenter) {  // Center the image horizontally
+    startHeight = (int)((imageHeight / 2) - (imgHeight / 2));
+    endHeight = (int)((imageHeight / 2) + (imgHeight / 2));
+  } else {
+    startHeight = 0;  // Take jsut the top of the image
+    endHeight = (int)imgHeight;
+  }
+}
+
+// Find the triangle coordinate of an x,y point
+
+Coord GetPixelCoord(int x, int y, int imageHeight, int imageWidth) {
+  float pix_height = imageHeight / TRI_GEN;
+  float pix_width = imageWidth / (TRI_GEN*2);
+  
+  // y is easy. Flip in direction between processing and triangles have different 0's
+  int coord_y = (int)(y / pix_height);
+  int remain_y = y % round(pix_height);
+  
+  coord_y = TRI_GEN - coord_y - 1;
+  
+  // x is harder - Needs improvemnt
+  int coord_x = (int)(x / pix_width);
+  int remain_x = x % round(pix_width);
+  
+  if ((coord_x + coord_y) % 2 == 0) {
+    coord_x += bin_upward_diag(remain_x,remain_y,pix_width,pix_height);  // evens
+  } else {
+    coord_x += bin_downward_diag(remain_x,remain_y,pix_width,pix_height);  // odds
+  }
+  return (new Coord(coord_x,coord_y));
+}
+
+//
+// bin_upward_diag
+//
+// is the x value to the left or right of the diagonal made by
+// drawing a line from (0,0) to (x2,y2)
+// return -1 for left, 0 for right
+int bin_upward_diag(int x, int y, float x2, float y2) {
+  float x_line = y * x2/y2;
+  if (x > x_line) {
+    return 1;
+  } else {
+    return 0;
+  }
+}
+
+//
+// bin_downward_diag
+//
+// is the x value to the left or right of the diagonal made by
+// drawing a line from (0,y2) to (x2,0)
+// return -1 for left, 0 for right
+int bin_downward_diag(int x, int y, float x2, float y2) {
+  float x_line = x2 - ((x2 * y) / y2);
+  if (x > x_line) {
+    return 1;
+  } else {
+    return 0;
   }
 }
 
@@ -412,6 +843,15 @@ boolean IsCoordinGrid(int x, int y, int grid) {
   if (!isPointUp(getBigX(grid),getBigY(grid))) {
     y = TRI_GEN - y - 1;
   }
+  
+  return (IsCoordinSimpleGrid(x,y));
+}
+
+//
+// IsCoordinSimpleGrid
+//
+// Checks to see whether (x,y) is on a (0,0) grid
+boolean IsCoordinSimpleGrid(int x, int y) {
   // Check y-row first
   if (y < 0 || y >= TRI_GEN) {
    return (false);  // y is out of bounds
@@ -420,7 +860,6 @@ boolean IsCoordinGrid(int x, int y, int grid) {
   if (x < y || x >= y + rowWidth(y)) {
     return (false);  // x is out of bounds
   }
-  
   return (true);
 }
 
@@ -430,7 +869,10 @@ boolean IsCoordinGrid(int x, int y, int grid) {
 //
 
 int GetLightFromCoord(int x, int y, int grid) {
-  if (IsCoordinGrid(x,y,grid) == false) return (NONE);
+  if (IsCoordinGrid(x,y,grid) == false) {
+    println(x,y,grid);
+    return (NONE);
+  }
   
   int light = 0;  // LED number
   int rowflip;  // Whether the row flips order
@@ -692,7 +1134,7 @@ void drawBigFrame(int grid) {
   strokeWeight(5);
   drawTriangle(x_coord,y_coord,BASE,isPointUp(x,y));
   strokeWeight(1);
-  /*
+  
   if (DRAW_LABELS == 0) {
     // Draw the connector point as a red triangle
     boolean up = isPointUp(getBigX(grid),getBigY(grid));
@@ -713,25 +1155,6 @@ void drawBigFrame(int grid) {
         break;
     }
   }
-  */
-}
-
-//
-// drawGuides
-//
-// Paints the first few pixels red of each Big Triangle
-// as a way to check orientation
-//
-void drawGuides() {
-  int r = 255;
-  int g = 0;
-  int b = 0;
-  for (int grid = 0; grid < numBigTri; grid++) {
-    for (int pix = 0; pix < TRI_GEN; pix++) {  // half a row
-      triGrid[grid].setCellColor(color(r,g,b), pix);  // Simulator
-      setPixelBuffer(grid, pix, r, g, b);  // Lights 
-    }
-  }
 }
 
 //
@@ -750,64 +1173,48 @@ void drawTriangle(int x, int y, int size, boolean up) {
 }
 
 //
-//  Server Routines
-//
-
-void pollServer() {
-  try {
-    Client c = _server.available();
-    // append any available bytes to the buffer
-    if (c != null) {
-      _buf.append(c.readString());
-    }
-    // process as many lines as we can find in the buffer
-    int ix = _buf.indexOf("\n");
-    while (ix > -1) {
-      String msg = _buf.substring(0, ix);
-      msg = msg.trim();
-      //println(msg);
-      processCommand(msg);
-      _buf.delete(0, ix+1);
-      ix = _buf.indexOf("\n");
-    }
-  } catch (Exception e) {
-    println("exception handling network command");
-    e.printStackTrace();
-  }  
-}
-
-//Pattern cmd_pattern = Pattern.compile("^\\s*(\\d+)\\s+(\\d+),(\\d+),(\\d+)\\s*$");
-Pattern cmd_pattern = Pattern.compile("^\\s*(\\d+),(\\d+),(\\d+),(\\d+),(\\d+)\\s*$");
-
-void processCommand(String cmd) {
-  Matcher m = cmd_pattern.matcher(cmd);
-  if (!m.find()) {
-    println("ignoring input!");
-    return;
-  }
-  int tri  = Integer.valueOf(m.group(1));
-  int pix  = Integer.valueOf(m.group(2));
-  int r    = Integer.valueOf(m.group(3));
-  int g    = Integer.valueOf(m.group(4));
-  int b    = Integer.valueOf(m.group(5));
-  
-  //println(String.format("setting pixel:%d,%d to r:%d g:%d b:%d", tri, pix, r, g, b));
-  
-  color correct = colorCorrect(r,g,b);
-  
-  r = adj_brightness(red(correct));
-  g = adj_brightness(green(correct));
-  b = adj_brightness(blue(correct));
-  
-  triGrid[tri].setCellColor(color(r,g,b), pix);  // Simulator
-  setPixelBuffer(tri, pix, r, g, b);  // Lights  
-}
-
-//
 //  Routines to interact with the Lights
 //
 
+void movePixelsToBuffer() {
+  for (int y=0; y<TRI_GEN; y++) {  // rows
+    for (int x=0; x<rowWidth(y); x++) {  // columns
+      for (int grid=0; grid<numBigTri; grid++) {  // Big Triangles
+        // Does Big Triangle point down?
+        boolean pointDown = !isPointUp(getBigX(grid),getBigY(grid));
+        
+        // Get rgb values from binned tri
+        Coord simple_coord = new Coord(x+y,y);
+        if (simple_coord.outofbounds()) continue;  // Otherwise memory fault
+        
+        if (pointDown) simple_coord.y = TRI_GEN - y - 1;  // Flip image
+        
+        // Convert to big-tri coordinates
+        Coord complex_coord = new Coord(simple_coord.x + (getBigX(grid) * TRI_GEN),
+                                        simple_coord.y + (getBigY(grid) * TRI_GEN) );
+        
+        // Figure out the pixel number
+        int pix = GetLightFromCoord(complex_coord.x,complex_coord.y,grid);
+        
+        if (pix == NONE) continue;
+        
+        // Flip image back for downward grids
+        if (pointDown) simple_coord.y = TRI_GEN-y-1;
+        
+        RGBColor rgb = pixelarray.Pixels[get_index(simple_coord)].pixcolor;
+        int r = (int)rgb.r;
+        int g = (int)rgb.g;
+        int b = (int)rgb.b;
+        
+        setPixelBuffer(grid, pix, r,g,b);  // Lights
+        triGrid[grid].setCellColor(color(r,g,b), pix);  // Simulator 
+      }
+    }
+  }
+}
+        
 void sendDataToLights() {
+  
   int BigTri, pixel;
   
   if (testObserver.hasStrips) {   
@@ -820,7 +1227,7 @@ void sendDataToLights() {
     BigTri = 0;
     
     for (Strip strip : strips) {      
-      for (pixel = 0; pixel < NUM_PIXELS; pixel++) {
+      for (pixel = 0; pixel < (TRI_GEN*TRI_GEN); pixel++) {
          if (hasChanged(BigTri,pixel)) {
            strip.setPixel(getPixelBuffer(BigTri,pixel), pixel);
          }
@@ -831,120 +1238,33 @@ void sendDataToLights() {
   }
 }
 
-private void prepareExitHandler () {
-
-  Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
-
-    public void run () {
-
-      System.out.println("Shutdown hook running");
-
-      List<Strip> strips = registry.getStrips();
-      for (Strip strip : strips) {
-        for (int i=0; i<strip.getLength(); i++)
-          strip.setPixel(#000000, i);
-      }
-      for (int i=0; i<100000; i++)
-        Thread.yield();
-    }
-  }
-  ));
-}
-
-//
-//  Routines for the strip buffer
-//
-
-int adj_brightness(float value) {
-  return (int)(value * BRIGHTNESS / 100);
-}
-
-color colorCorrect(int r, int g, int b) {
-  switch(COLOR_STATE) {
-    case 1:  // no red
-      if (r > 0) {
-        if (g == 0) {
-          g = r;
-          r = 0;
-        } else if (b == 0) {
-          b = r;
-          r = 0;
-        }
-      }
-      break;
-    
-    case 2:  // no green
-      if (g > 0) {
-        if (r == 0) {
-          r = g;
-          g = 0;
-        } else if (b == 0) {
-          b = g;
-          g = 0;
-        }
-      }
-      break;
-    
-    case 3:  // no blue
-      if (b > 0) {
-        if (r == 0) {
-          r = b;
-          b = 0;
-        } else if (g == 0) {
-          g = b;
-          b = 0;
-        }
-      }
-      break;
-    
-    case 4:  // all red
-      if (r == 0) {
-        if (g > b) {
-          r = g;
-          g = 0;
-        } else {
-          r = b;
-          b = 0;
-        }
-      }
-      break;
-    
-    case 5:  // all green
-      if (g == 0) {
-        if (r > b) {
-          g = r;
-          r = 0;
-        } else {
-          g = b;
-          b = 0;
-        }
-      }
-      break;
-    
-    case 6:  // all blue
-      if (b == 0) {
-        if (r > g) {
-          b = r;
-          r = 0;
-        } else {
-          b = g;
-          g = 0;
-        }
-      }
-      break;
-    
-    default:
-      break;
-  }
-  return color(r,g,b);   
-}
-
 void initializeColorBuffers() {
   for (int t = 0; t < numBigTri; t++) {
     for (int p = 0; p < NUM_PIXELS; p++) {
+      curr_buffer[t][p][0] = 100;
+      curr_buffer[t][p][1] = 100;
+      curr_buffer[t][p][2] = 100;
       setPixelBuffer(t, p, 0,0,0);
     }
   }
+  sendDataToLights();
+  pushColorBuffer();
+  println("go!");
+}
+
+void forceBlack() {
+  for (int t = 0; t < numBigTri; t++) {
+    for (int p = 0; p < NUM_PIXELS; p++) {
+      curr_buffer[t][p][0] = 100;
+      curr_buffer[t][p][1] = 100;
+      curr_buffer[t][p][2] = 100;
+      setPixelBuffer(t, p, 0,0,0);  // Lights
+    }
+    for (int p = 0; p < TRI_GEN*TRI_GEN; p++) {
+      triGrid[t].setCellColor(color(0,0,0), p);  // Simulator
+    }
+  }
+  sendDataToLights();
   pushColorBuffer();
 }
 
@@ -991,8 +1311,23 @@ int bounds(int value, int minimun, int maximum) {
   if (value > maximum) return maximum;
   return value;
 }
-    
-  
-  
 
+private void prepareExitHandler () {
 
+  Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
+
+    public void run () {
+
+      System.out.println("Shutdown hook running");
+
+      List<Strip> strips = registry.getStrips();
+      for (Strip strip : strips) {
+        for (int i=0; i<strip.getLength(); i++)
+          strip.setPixel(#000000, i);
+      }
+      for (int i=0; i<100000; i++)
+        Thread.yield();
+    }
+  }
+  ));
+}
