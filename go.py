@@ -244,10 +244,10 @@ class TriWeb(object):
 
         ret_html += """
         <form action="/show_time">
-            <input type='text' name='show_time'></input>
+            <input type='text' name='show_time' value={0}></input>
             <input type='submit' value='set show time'></input>
         </form>
-        """
+        """.format(int(self.runner.max_show_time))
         return ret_html
 
     @cherrypy.expose
