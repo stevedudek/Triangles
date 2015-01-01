@@ -32,10 +32,10 @@ int numBigTri = 6;  // Number of Big Triangles
 
 // Relative coordinates for the Big Triangles
 int[][] BigTriCoord = {
-  {2,0},  // Strip 1
-  {2,1},  // Strip 2
+  {0,0},  // Strip 1
+  {0,1},  // Strip 2
   {4,0},  // Strip 3
-  {4,1},  // Strip 4
+  {2,0},  // Strip 4
   {6,0},  // Strip 5
   {6,1}   // Strip 6
 };
