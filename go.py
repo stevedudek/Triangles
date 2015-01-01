@@ -119,7 +119,6 @@ class ShowRunner(threading.Thread):
             print "choosing random show"
             s = self.randseq.next()
 
-        self.queue.put("clear")
         self.prev_show = self.show
 
         self.show = s(self.model)
@@ -151,7 +150,9 @@ class ShowRunner(threading.Thread):
                     self.show_runtime += real_d
                     if self.show_runtime > self.max_show_time:
                         print "max show time elapsed, changing shows"
-                        self.next_show()
+                        self.queue.put("run_show:") #next_show
+                        self.queue.put("clear") #next_show
+                        # self.next_show()
                 else:
                     print "show is out of frames, waiting..."
                     time.sleep(2)
@@ -254,8 +255,8 @@ class TriWeb(object):
 
     @cherrypy.expose
     def next_show(self, show_name=None):
-
-        self.runner.next_show(show_name)
+        self.runner.queue.put("run_show:"+show_name)
+        self.runner.queue.put("clear")
         ret_html = "<a href=/>HOME</a>"
         return ret_html + self.redirect_home_html
 
