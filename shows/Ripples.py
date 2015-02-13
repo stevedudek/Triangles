@@ -32,7 +32,7 @@ class Ripples(object):
 			# Move the center of the ripple like a drunken mason
 			if oneIn(5):
 				newtri = choice(neighbors(self.center))
-				if self.tri.cell_exists(newtri):
+				if self.tri.is_on_board(newtri):
 					self.center = newtri
 				
 			self.time = (self.time + 1) % 100000	# Advance the timer

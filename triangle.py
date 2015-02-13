@@ -12,12 +12,12 @@ Direction: As viewed from corner, lights go 'L' = Left, 'R' = Right
 """
 NUM_BIG_TRI = 6
 
-BIG_COORD = [ ((0, 0), 'C', 'R'),
-              ((0, 1), 'L', 'L'),
-              ((4, 0), 'L', 'R'),
-              ((2, 0), 'C', 'L'),
-              ((6, 0), 'C', 'R'),
-              ((6, 1), 'L', 'L') ]
+BIG_COORD = [ ((3, 2), 'L', 'R'),
+              ((5, 2), 'L', 'R'),
+              ((7, 2), 'L', 'R'),
+              ((4, 1), 'L', 'R'),
+              ((6, 1), 'L', 'R'),
+              ((5, 0), 'L', 'R') ]
 
 from HelperFunctions import ROTATE_CLOCK, ROTATE_COUNTER, ROTATE_COORD_CLOCK
 from HelperFunctions import distance
@@ -201,6 +201,29 @@ class Triangle(object):
             if y == row:
                 cells.append(coord)
         return cells
+
+    def is_on_board(self, coord):
+        # return self.cell_exists(coord)     
+        
+        "Return true if coordinate is between min and max of that row"
+        (x,y) = coord
+        row_cells = self.get_row(y)
+        if row_cells == []: # Row does not exist
+            return False
+        else:
+            min_x = 1000    # Seed value
+            max_x = -1000   # Seed value
+
+            for (row_x, row_y) in row_cells:
+                if row_x > max_x:
+                    max_x = row_x
+                elif row_x < min_x:
+                    min_x = row_x
+
+            if x >= min_x and x <= max_x:
+                return True
+            else:
+                return False
 
     def six_mirror(self, coord):
         "Returns the six-fold mirror coordinates"

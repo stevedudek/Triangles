@@ -37,7 +37,7 @@ class Spinner(object):
 	
 	def move_spinner(self):
 		newspot = tri_in_direction(self.pos, randDir(), 2)
-		if self.tri.cell_exists(newspot):
+		if self.tri.is_on_board(newspot):
 			self.pos = newspot
 			
 		if self.expand == 1:

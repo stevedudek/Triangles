@@ -20,7 +20,7 @@ class Pinwheel(object):
 	
 	def move_pinwheel(self):			
 		newspot = tri_in_direction(self.pos, self.dir, 1)	# Where is the pinwheel going?
-		if self.tri.cell_exists(newspot) and self.life < 10:	# Is new spot off the board?
+		if self.tri.is_on_board(newspot) and self.life < 10:	# Is new spot off the board?
 			self.pos = newspot	# On board. Update spot
 			self.life += 1
 			return True

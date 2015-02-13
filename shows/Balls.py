@@ -27,7 +27,7 @@ class Ball(object):
 		tries = 20
 		while (tries > 0):
 			newspot = tri_in_direction(self.pos, self.dir, 2)	# Where is the ball going?
-			if self.tri.cell_exists(newspot):	# Is new spot off the board?
+			if self.tri.is_on_board(newspot):	# Is new spot off the board?
 				self.pos = newspot	# On board. Update spot
 				return
 			else:

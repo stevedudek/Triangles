@@ -32,12 +32,12 @@ int numBigTri = 6;  // Number of Big Triangles
 
 // Relative coordinates for the Big Triangles
 int[][] BigTriCoord = {
-  {0,0},  // Strip 1
-  {0,1},  // Strip 2
-  {4,0},  // Strip 3
-  {2,0},  // Strip 4
-  {6,0},  // Strip 5
-  {6,1}   // Strip 6
+  {3,2},  // Strip 1
+  {5,2},  // Strip 2
+  {7,2},  // Strip 3
+  {4,1},  // Strip 4
+  {6,1},  // Strip 5
+  {5,0}   // Strip 6
 };
 
 // Matrix listing where the connector attaches physically
@@ -286,7 +286,7 @@ void mouseClicked() {
    
   }  else if (mouseX > 200 && mouseX < 215 && mouseY > SCREEN_HEIGHT+4 && mouseY < SCREEN_HEIGHT+19) {
     // Bright down checkbox  
-    if (BRIGHTNESS > 10) BRIGHTNESS -= 5;
+    if (BRIGHTNESS > 5) BRIGHTNESS -= 5;
    
     // Bright up checkbox
   } else if (mouseX > 200 && mouseX < 215 && mouseY > SCREEN_HEIGHT+22 && mouseY < SCREEN_HEIGHT+37) {

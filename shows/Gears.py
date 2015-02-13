@@ -14,7 +14,7 @@ class Bullet(object):
 	
 	def move_bullet(self):
 		newspot = tri_in_direction(self.pos, self.dir, 3)	# Where is the bullet shooting?
-		if self.tri.cell_exists(newspot):	# Is new spot off the board?
+		if self.tri.is_on_board(newspot):	# Is new spot off the board?
 			self.pos = newspot	# On board. Update spot
 			self.intense -= 0.05
 			return True		# Still traveling

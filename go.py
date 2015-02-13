@@ -308,7 +308,8 @@ if __name__=='__main__':
     app = TriangleServer(full_triangles, args)
     try:
         app.start() # start related service threads
-        app.go_web(app)
+        app.go_headless(app)
+        #app.go_web(app)
 
     except Exception, e:
         print "Unhandled exception running Triangles!"

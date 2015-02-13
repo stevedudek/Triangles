@@ -13,7 +13,7 @@ class Bullet(object):
 	
 	def move_bullet(self):			
 		newspot = tri_in_direction(self.pos, self.dir, 1)	# Where is the bullet going?
-		if self.tri.cell_exists(newspot):	# Is new spot off the board?
+		if self.tri.is_on_board(newspot):	# Is new spot off the board?
 			self.pos = newspot	# On board. Update spot
 			self.draw_bullet()
 			return True
@@ -29,7 +29,7 @@ class Spinner(object):
 
 	def move_spinner(self):
 		newspot = tri_in_direction(self.pos, randDir(), 2)
-		if self.tri.cell_exists(newspot):
+		if self.tri.is_on_board(newspot):
 			self.pos = newspot
 		if self.time > 100:
 			self.time = 0
@@ -41,7 +41,7 @@ class Spinner(object):
 			ring_cells = get_ring(self.pos, size)
 			num_cells = len(ring_cells)
 			for c in range(num_cells):
-				if self.tri.cell_exists(ring_cells[c]):
+				if self.tri.is_on_board(ring_cells[c]):
 					gradient = 1 - (abs(c - (self.time % num_cells))/(float)(num_cells-1))
 					#self.tri.set_cell(ring_cells[c],gradient_wheel(color, gradient))
 					self.tri.set_cells(self.tri.mirror_coords(ring_cells[c]),
