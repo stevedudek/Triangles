@@ -12,10 +12,30 @@ import util
 
 import cherrypy
 
+def speed_interpolation(val):
+    """
+    Interpolation function to map OSC input into ShowRunner speed_x
+
+    Input values range from 0.0 to 1.0
+    input 0.5 => 1.0
+    input < 0.5 ranges from 2.0 to 1.0
+    input > 0.5 ranges from 1.0 to 0.5
+    """
+    if val == 0.5:
+        return 1.0
+    elif val < 0.5:
+        return low_interp(val)
+    else:
+        return hi_interp(val)
+
+low_interp = util.make_interpolater(0.0, 0.5, 10.0, 1.0)
+hi_interp  = util.make_interpolater(0.5, 1.0, 1.0, 0.1)
+
 class ShowRunner(threading.Thread):
-    def __init__(self, model, queue, max_showtime=1000):
+    def __init__(self, model, simulator, queue, max_showtime=1000):
         super(ShowRunner, self).__init__(name="ShowRunner")
         self.model = model
+        self.simulator = simulator
         self.queue = queue
 
         self.running = True
@@ -32,10 +52,14 @@ class ShowRunner(threading.Thread):
 
         # current show parameters
 
-        # show speed multiplier - ranges from 0.5 to 2.0
+        # show speed multiplier - ranges from 0.1 to 10
         # 1.0 is normal speed
         # lower numbers mean faster speeds, higher is slower
         self.speed_x = 1.0
+
+        # brightness - ranges from 5 to 100%
+        # 100% is initial value
+        self.brightness_x = 100
 
     def status(self):
         if self.running:
@@ -93,15 +117,21 @@ class ShowRunner(threading.Thread):
                 elif cmd == 'speed':
                     self.speed_x = speed_interpolation(val)
                     print "setting speed_x to:", self.speed_x
-
+                elif cmd == 'brightness':
+                    self.send_OSC_cmd('brightness', int(val))
+                    self.brightness_x = val
+                    print "setting brightness to:", int(val)
                 pass
             elif ns == '2':
-                # show command
-                if self.show_params:
-                    self.show.set_param(cmd, val)
+                # show command - one of the 7 color buttons
+                self.send_OSC_cmd('color', cmd[4:])
 
         else:
             print "ignoring unknown msg:", str(msg)
+
+    def send_OSC_cmd(self, cmd, value):
+        "Dump command to simulator.py"
+        self.simulator.relay_OSC_cmd(cmd, value)
 
     def clear(self):
         self.model.clear()
@@ -119,6 +149,7 @@ class ShowRunner(threading.Thread):
             print "choosing random show"
             s = self.randseq.next()
 
+        self.clear()
         self.prev_show = self.show
 
         self.show = s(self.model)
@@ -150,9 +181,9 @@ class ShowRunner(threading.Thread):
                     self.show_runtime += real_d
                     if self.show_runtime > self.max_show_time:
                         print "max show time elapsed, changing shows"
-                        self.queue.put("run_show:") #next_show
-                        self.queue.put("clear") #next_show
-                        # self.next_show()
+                        # self.queue.put("run_show:") #next_show
+                        # self.queue.put("clear") #next_show
+                        self.next_show()
                 else:
                     print "show is out of frames, waiting..."
                     time.sleep(2)
@@ -163,13 +194,27 @@ class ShowRunner(threading.Thread):
                 traceback.print_exc()
                 self.next_show()
 
+def osc_listener(q, port=5700):
+    "Create the OSC Listener thread"
+    print "trying OSC"
+    import osc_serve
+
+    listen_address=('0.0.0.0', port)
+    print "Starting OSC Listener on %s:%d" % listen_address
+    osc = osc_serve.create_server(listen_address, q)
+    st = threading.Thread(name="OSC Listener", target=osc.serve_forever)
+    st.daemon = True
+    return st
 
 class TriangleServer(object):
-    def __init__(self, triangle_model, args):
+    def __init__(self, triangle_model, triangle_simulator, args):
         self.args = args
         self.triangle_model = triangle_model
+        self.triangle_simulator = triangle_simulator
 
         self.queue = Queue.LifoQueue()
+
+        self.osc_thread = None
 
         self.runner = None
 
@@ -177,8 +222,16 @@ class TriangleServer(object):
         self._create_services()
 
     def _create_services(self):
+        # OSC listener
+        try:
+            self.osc_thread = osc_listener(self.queue)
+        except Exception, e:
+            print "WARNING: Can't create OSC listener"
+
         # Show runner
-        self.runner = ShowRunner(self.triangle_model, self.queue, args.max_time)
+        self.runner = ShowRunner(self.triangle_model, self.triangle_simulator,
+            self.queue, args.max_time)
+
         if args.shows:
             print "setting show:", args.shows[0]
             self.runner.next_show(args.shows[0])
@@ -189,6 +242,9 @@ class TriangleServer(object):
             return
 
         try:
+            if self.osc_thread:
+                self.osc_thread.start()
+
             self.runner.start()
 
             self.running = True
@@ -199,6 +255,8 @@ class TriangleServer(object):
     def stop(self):
         if self.running: # should be safe to call multiple times
             try:
+                # OSC listener is a daemon thread so it will clean itself up
+
                 # ShowRunner is shut down via the message queue
                 self.queue.put("shutdown")
 
@@ -277,7 +335,7 @@ class TriWeb(object):
 
 if __name__=='__main__':
     import argparse
-    parser = argparse.ArgumentParser(description='Baaahs Light Control')
+    parser = argparse.ArgumentParser(description='Triangles Light Control')
 
     parser.add_argument('--max-time', type=float, default=float(180),
                         help='Maximum number of seconds a show will run (default 180)')
@@ -305,7 +363,7 @@ if __name__=='__main__':
     model = SimulatorModel(sim_host, port=sim_port)
     full_triangles = triangle.load_triangles(model)
 
-    app = TriangleServer(full_triangles, args)
+    app = TriangleServer(full_triangles, model, args)
     try:
         app.start() # start related service threads
         app.go_headless(app)

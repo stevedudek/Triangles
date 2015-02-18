@@ -56,6 +56,15 @@ class SimulatorModel(object):
 
         self.dirty = {}
 
+    def relay_OSC_cmd(self, cmd, value):
+        "Relay to Processing the OSC command"
+        msg = "OSC,%s,%s" % (cmd,value)
+
+        if self.debug:
+            print msg
+        self.sock.send(msg)
+        self.sock.send('\n')
+
     def constrain_color(self, color):
         (r,g,b) = color
         return (self.constrain(r), self.constrain(g), self.constrain(b))

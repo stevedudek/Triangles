@@ -288,9 +288,9 @@ void mouseClicked() {
     // Bright down checkbox  
     if (BRIGHTNESS > 5) BRIGHTNESS -= 5;
    
-    // Bright up checkbox
   } else if (mouseX > 200 && mouseX < 215 && mouseY > SCREEN_HEIGHT+22 && mouseY < SCREEN_HEIGHT+37) {
-      if (BRIGHTNESS <= 95) BRIGHTNESS += 5;
+    // Bright up checkbox
+    if (BRIGHTNESS <= 95) BRIGHTNESS += 5;
   
   }  else if (mouseX > 400 && mouseX < 420 && mouseY > SCREEN_HEIGHT+10 && mouseY < SCREEN_HEIGHT+30) {
     // No color correction  
@@ -778,13 +778,24 @@ void pollServer() {
 
 //Pattern cmd_pattern = Pattern.compile("^\\s*(\\d+)\\s+(\\d+),(\\d+),(\\d+)\\s*$");
 Pattern cmd_pattern = Pattern.compile("^\\s*(\\d+),(\\d+),(\\d+),(\\d+),(\\d+)\\s*$");
+Pattern osc_pattern = Pattern.compile("^\\s*(\\w+),(\\w+),(\\d+)\\s*$");
 
 void processCommand(String cmd) {
-  Matcher m = cmd_pattern.matcher(cmd);
-  if (!m.find()) {
+  Matcher m = cmd_pattern.matcher(cmd);  // For RGB commands
+  Matcher o = osc_pattern.matcher(cmd);  // For OSC commands
+  
+  if (m.find()) {
+    Process_RGB_command(m);
+  } else if (o.find()) {
+    Process_OSC_command(o);
+  } else {
+    println(cmd);
     println("ignoring input!");
     return;
   }
+}
+
+void Process_RGB_command(Matcher m) {
   int tri  = Integer.valueOf(m.group(1));
   int pix  = Integer.valueOf(m.group(2));
   int r    = Integer.valueOf(m.group(3));
@@ -800,7 +811,25 @@ void processCommand(String cmd) {
   b = adj_brightness(blue(correct));
   
   triGrid[tri].setCellColor(color(r,g,b), pix);  // Simulator
-  setPixelBuffer(tri, pix, r, g, b);  // Lights  
+  setPixelBuffer(tri, pix, r, g, b);  // Lights 
+  
+  return;
+}
+
+void Process_OSC_command(Matcher o) {
+  String osc  = String.valueOf(o.group(1));
+  String cmd  = String.valueOf(o.group(2));
+  int value   = Integer.valueOf(o.group(3));
+  
+  if (!osc.equals("OSC")) {
+    println("Did not receive an OSC header for: %s, %s, %d", osc, cmd, value);
+  } else {
+    if (cmd.equals("color")) {
+      COLOR_STATE = value;
+    } else if (cmd.equals("brightness")) {
+      BRIGHTNESS = value;
+    }
+  }
 }
 
 //
