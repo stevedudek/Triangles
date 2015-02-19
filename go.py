@@ -18,8 +18,8 @@ def speed_interpolation(val):
 
     Input values range from 0.0 to 1.0
     input 0.5 => 1.0
-    input < 0.5 ranges from 2.0 to 1.0
-    input > 0.5 ranges from 1.0 to 0.5
+    input < 0.5 ranges from 10.0 to 1.0
+    input > 0.5 ranges from 1.0 to 0.1
     """
     if val == 0.5:
         return 1.0
@@ -51,6 +51,9 @@ class ShowRunner(threading.Thread):
         self.framegen = None
 
         # current show parameters
+
+        # video is off at the stop
+        self.video = False
 
         # show speed multiplier - ranges from 0.1 to 10
         # 1.0 is normal speed
@@ -109,13 +112,26 @@ class ShowRunner(threading.Thread):
             (ns, cmd) = addr[1:].split('/')
             if ns == '1':
                 # control command
-                if cmd == 'next':
-                    self.next_show()
+                if cmd == 'video':
+                    self.video = not self.video
+                    self.send_OSC_cmd('video', 0)
+                    if self.video:
+                        print "turning video on"
+                    else:
+                        print "turning video off"                    
+                elif cmd == 'next':
+                    if self.video:
+                        print "next video"
+                        self.send_OSC_cmd('nextvideo', 0)
+                    else:
+                        print "next show"
+                        self.next_show()
                 elif cmd == 'previous':
                     if self.prev_show:
                         self.next_show(self.prev_show.name)
                 elif cmd == 'speed':
                     self.speed_x = speed_interpolation(val)
+                    self.send_OSC_cmd('speed', int(val * 10)) # For video player
                     print "setting speed_x to:", self.speed_x
                 elif cmd == 'brightness':
                     self.send_OSC_cmd('brightness', int(val))
