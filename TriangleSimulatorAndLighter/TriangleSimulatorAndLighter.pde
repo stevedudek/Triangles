@@ -146,7 +146,7 @@ int PIX_DENSITY = 10;  // How many pixels wide is each little triangle
 int FRAME_WIDTH = (int)(grid_width() * PIX_DENSITY * TRI_GEN);
 int FRAME_HEIGHT = (int)(grid_height() * PIX_DENSITY * TRI_GEN);
 float[] movie_speeds = { 0.0, 0.2, 0.4, 0.75, 1.0, 1.5, 2.0, 3.0, 4.0, 5.0, 6.0 };
-String[] movie_titles = { "penguin", "Earth" };
+String[] movie_titles = { "penguin", "Earth", "banana", "bluedot", "nyancat" };
 
 // Brute-force arrays of triangle numbers
 // used for rotations of the whole Triangle
