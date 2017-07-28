@@ -14,6 +14,6 @@ class BlueOutline(object):
 		
 		while (True):
 			for corner in all_left_corners():
-				self.tri.set_cells(tri_shape(corner, 10), self.color)
+				self.tri.set_cells(tri_shape(corner, 12), self.color)
 
 			yield self.speed

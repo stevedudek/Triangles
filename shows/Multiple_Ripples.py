@@ -1,5 +1,6 @@
 from HelperFunctions import*
 from triangle import*
+from math import sin, pi
 
 class Rip(object):
 	def __init__(self, trimodel):
@@ -12,28 +13,29 @@ class Rip(object):
 		return self.lifetime	# True is still have life; False if life = 0
 				
 class Multiple_Ripples(object):
-    def __init__(self, trimodel):
-        self.name = "Multiple_Ripples"        
-        self.tri = trimodel
-        self.rips = []	# List that holds Rip objects
-        
-        self.time = 0
-        self.speed = 0.01
-        self.width = randint(8,20)      
-        self.color = randColor() 
-    
-    def get_att(self, width, ring, time):
-		saw = (1.0 / width) * (ring + ((100000 - time) % 30))	# Linear sawtooth
-		while saw >= 2: saw = saw - 2	# Cut into sawtooth periods
-		if saw > 1: saw = 2 - saw	# Descending part of sawtooth
-		return saw 
-		          
-    def next_frame(self):
-    	
-    	self.tri.clear()
+	def __init__(self, trimodel):
+		self.name = "Multiple_Ripples"
+		self.tri = trimodel
+		self.rips = []	# List that holds Rip objects
 
-    	while (True):
-			
+		self.time = 0
+		self.speed = 0.1
+		self.width = randint(8,20)
+		self.color = randColor()
+
+	def get_att(self, width, ring, time):
+		sine_width = width
+		gradient = (ring + time) % sine_width
+		attenuation = sin(2 * pi * gradient / sine_width)
+		attenuation = (attenuation + 1) / 2.0
+		return attenuation
+
+	def next_frame(self):
+
+		self.tri.clear()
+
+		while (True):
+
 			# Check how many rips are in play
 			# If no rips, add one. If rips < 6 then add one more randomly
 			while len(self.rips) < 4 or oneIn(20):
@@ -42,9 +44,9 @@ class Multiple_Ripples(object):
 			
 			# Draw the rings
 			for i in range (8): # total number of rings - can be bigger than display
-				for r in self.rips:
+				for j, r in enumerate(self.rips):
 					self.tri.set_cells(get_ring(r.center, i),
-						gradient_wheel(self.color, self.get_att(self.width,i,self.time)))
+						gradient_wheel(self.color, self.get_att(self.width, i , self.time + j)))
 			
 			# Slowly change the colors
 			self.color = (self.color + 1) % maxColor

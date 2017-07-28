@@ -10,7 +10,7 @@ import triangle
 import shows
 import util
 
-import cherrypy
+# import cherrypy
 
 def speed_interpolation(val):
     """
@@ -301,53 +301,53 @@ class TriangleServer(object):
                     }
                 }
 
-        cherrypy.quickstart(TriWeb(app),
-                '/',
-                config=config)
+        # cherrypy.quickstart(TriWeb(app),
+        #         '/',
+        #         config=config)
 
-class TriWeb(object):
-    def __init__(self, app):
-        self.app = app
-        self.runner = self.app.runner
-        self.show_names = [s[0] for s in shows.load_shows()]
-        self.redirect_home_html = "<script>setTimeout(function(){window.location='/'},3000)</script>"
-        pass
-
-    @cherrypy.expose
-    def index(self):
-        ret_html = "Shows:<br>"
-        for i in self.show_names:
-            ret_html += "<a href=/next_show?show_name=%s > %s </a><br>" % (i,i)
-
-        ret_html += """
-        <form action="/show_time">
-            <input type='text' name='show_time' value={0}></input>
-            <input type='submit' value='set show time'></input>
-        </form>
-        """.format(int(self.runner.max_show_time))
-        return ret_html
-
-    @cherrypy.expose
-    def next_show(self, show_name=None):
-        self.runner.queue.put("run_show:"+show_name)
-        self.runner.queue.put("clear")
-        ret_html = "<a href=/>HOME</a>"
-        return ret_html + self.redirect_home_html
-
-    @cherrypy.expose
-    def show_time(self, show_time=float(180)):
-
-        self.runner.max_show_time = float(show_time)
-        ret_html = "this show will run for %s seconds (including time it's already run)" % show_time
-        return ret_html + self.redirect_home_html
-
-
-    @cherrypy.expose
-    def kill(self):
-        cherrypy.engine.exit()
-        self.app.stop()
-        import sys
-        sys.exit()
+# class TriWeb(object):
+#     def __init__(self, app):
+#         self.app = app
+#         self.runner = self.app.runner
+#         self.show_names = [s[0] for s in shows.load_shows()]
+#         self.redirect_home_html = "<script>setTimeout(function(){window.location='/'},3000)</script>"
+#         pass
+#
+#     @cherrypy.expose
+#     def index(self):
+#         ret_html = "Shows:<br>"
+#         for i in self.show_names:
+#             ret_html += "<a href=/next_show?show_name=%s > %s </a><br>" % (i,i)
+#
+#         ret_html += """
+#         <form action="/show_time">
+#             <input type='text' name='show_time' value={0}></input>
+#             <input type='submit' value='set show time'></input>
+#         </form>
+#         """.format(int(self.runner.max_show_time))
+#         return ret_html
+#
+#     @cherrypy.expose
+#     def next_show(self, show_name=None):
+#         self.runner.queue.put("run_show:"+show_name)
+#         self.runner.queue.put("clear")
+#         ret_html = "<a href=/>HOME</a>"
+#         return ret_html + self.redirect_home_html
+#
+#     @cherrypy.expose
+#     def show_time(self, show_time=float(180)):
+#
+#         self.runner.max_show_time = float(show_time)
+#         ret_html = "this show will run for %s seconds (including time it's already run)" % show_time
+#         return ret_html + self.redirect_home_html
+#
+#
+#     @cherrypy.expose
+#     def kill(self):
+#         cherrypy.engine.exit()
+#         self.app.stop()
+#         import sys
+#         sys.exit()
 
 if __name__=='__main__':
     import argparse

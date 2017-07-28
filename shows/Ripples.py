@@ -1,5 +1,6 @@
 from HelperFunctions import*
 from triangle import*
+from math import sin, pi
 
 class Ripples(object):
     def __init__(self, trimodel):
@@ -8,14 +9,15 @@ class Ripples(object):
         self.center = self.tri.get_rand_cell()
         self.time = 0
         self.speed = 0.1 + (random() / 2)
-        self.width = randint(8,20)      
+        self.width = randint(8,20)
         self.color = randColor()
     
     def get_att(self, width, ring, time):
-		saw = (1.0 / width) * (ring + ((100000 - time) % 30))	# Linear sawtooth
-		while saw >= 2: saw = saw - 2	# Cut into sawtooth periods
-		if saw > 1: saw = 2 - saw	# Descending part of sawtooth
-		return saw 
+		sine_width = width
+		gradient = (ring + time) % sine_width
+		attenuation = sin(2 * pi * gradient / sine_width)
+		attenuation = (attenuation + 1) / 2.0
+		return attenuation
 		          
     def next_frame(self):
     	

@@ -12,12 +12,12 @@ Direction: As viewed from corner, lights go 'L' = Left, 'R' = Right
 """
 NUM_BIG_TRI = 6
 
-BIG_COORD = [ ((3, 2), 'L', 'R'),
-              ((5, 2), 'L', 'R'),
-              ((7, 2), 'L', 'R'),
-              ((4, 1), 'L', 'R'),
-              ((6, 1), 'L', 'R'),
-              ((5, 0), 'L', 'R') ]
+BIG_COORD = [ ((1, 0), 'L', 'L'),
+              ((2, 0), 'L', 'L'),
+              ((3, 0), 'L', 'L'),
+              ((1, 1), 'L', 'L'),
+              ((2, 1), 'L', 'L'),
+              ((3, 1), 'L', 'L') ]
 
 from HelperFunctions import ROTATE_CLOCK, ROTATE_COUNTER, ROTATE_COORD_CLOCK
 from HelperFunctions import distance
@@ -52,7 +52,7 @@ class Triangle(object):
 
     def all_cells(self):
         "Return the list of valid coords"
-        return list(self.cellmap.keys())
+        return self.cellmap.keys()
 
     def cell_exists(self, coord):
         return self.cellmap[coord]
@@ -194,16 +194,12 @@ class Triangle(object):
                 return fix
 
     def get_row(self, row):
-        "Return all (x,y) coordinates on a row (y)"
-        cells = []
-        for coord in self.all_cells():
-            (x,y) = coord
-            if y == row:
-                cells.append(coord)
-        return cells
+        """Return all (x,y) coordinates on a row (y)
+           Terrible hack here because not all keys are well-defined tuples"""
+        return [(coord[0], coord[1]) for coord in self.all_cells() if isinstance(coord, tuple) and row == coord[1]]
 
     def is_on_board(self, coord):
-        # return self.cell_exists(coord)     
+        #return self.cell_exists(coord)     
         
         "Return true if coordinate is between min and max of that row"
         (x,y) = coord
@@ -501,13 +497,33 @@ def tri_shape(start, size):
     Triangle's left corner will be the 'start' pixel
     start's location will determine whether triangle points up or down
     """
-    size = 1 + (2*size) # For hex shape
+    size = 2 * (size-1)
 
-    (x,y) = start
-
+    # Clockwise addtion
     if point_up(start):
-        corns = [start, tri_in_direction(start,1,size+1), tri_in_direction(start,0,size+1)]
+        return (tri_in_line(start,1,size) +
+            tri_in_line( tri_in_direction(start,1,size), 5,size) +
+            tri_in_line( tri_in_direction(start,0,size), 3,size))
     else:
-        corns = [tri_in_direction(start,5,size+1), start, tri_in_direction(start,0,size+1)]
+        return (tri_in_line(start,0,size) +
+            tri_in_line( tri_in_direction(start,0,size), 4,size) +
+            tri_in_line( tri_in_direction(start,5,size), 2,size))
 
-    return tri_in_line(corns[0],1,size) + tri_in_line(corns[1],5,size) + tri_in_line(corns[2],3,size)
+def nested_triangles(start):
+    """
+    Return a list of lists of coordinates,
+    A list of concentric triangles with the largest first
+    with each triangle centered in the middle
+    Triangle's left corner will be the 'start' pixel
+    """
+    left_corn = start
+
+    cells = []
+    for size in range(TRI_GEN, 0, -3):
+        cells.append(tri_shape(left_corn,size))
+        if point_up(start):
+            left_corn = tri_in_direction( tri_in_direction(left_corn,1,2), 0,2)
+        else:
+            left_corn = tri_in_direction( tri_in_direction(left_corn,5,2), 0,2)
+
+    return cells

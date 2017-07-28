@@ -12,7 +12,7 @@ class Diagonals(object):
 		self.background = randColor()
 
 	def get_att(self, width, ring, time):
-		saw = (1.0 / width) * (ring + ((100000 - time) % 30))	# Linear sawtooth
+		saw = (1.0 / width) * (ring + (time % 1000))	# Linear sawtooth
 		while saw >= 2: saw = saw - 2	# Cut into sawtooth periods
 		if saw > 1: saw = 2 - saw	# Descending part of sawtooth
 		return saw
@@ -37,7 +37,7 @@ class Diagonals(object):
 	# Draw the background - concentric triangles of decreasing intensities
 	
 	def draw_background(self):
-		for i in range (10,0,-2): # total number of triangles
+		for i in range (12,0,-2): # total number of triangles
 			for corner in all_left_corners():
 				self.tri.set_cells(tri_shape(corner, i),
 					gradient_wheel(self.color, self.get_att(self.width,i,self.time)))

@@ -8,7 +8,7 @@
   Includes Tiling of
   Multiple Big Triangle Grids
   
-  12/8/14
+  7/17/17
   
   Built on glorious Hex Simulator
   
@@ -48,11 +48,11 @@ int[][] BigTriCoord = {
 // as viewed from corner
 // 'L' = Left, 'R' = Right
 char[][] connectors = {
-  {'C','R'},  // Strip 1
+  {'L','L'},  // Strip 1
   {'L','L'},  // Strip 2
-  {'L','R'},  // Strip 3
-  {'C','L'},  // Strip 4
-  {'C','R'},  // Strip 5
+  {'L','L'},  // Strip 3
+  {'L','L'},  // Strip 4
+  {'L','L'},  // Strip 5
   {'L','L'}   // Strip 6
 };
 
@@ -120,7 +120,7 @@ int[][][] curr_buffer = new int[numBigTri][NUM_PIXELS][3];
 int[][][] next_buffer = new int[numBigTri][NUM_PIXELS][3];
 
 // Calculated pixel constants for simulator display
-int SCREEN_SIZE = 800;  // square screen
+int SCREEN_SIZE = 700;  // square screen
 float TRI_SIZE = (SCREEN_SIZE - 20) / (TRI_GEN * grid_width());  // Scale triangles to fit screen
 float TRI_HEIGHT = TRI_SIZE * 0.866;
 int BASE = (int)(TRI_GEN * TRI_SIZE);  // Width of big triangle
@@ -489,8 +489,9 @@ void mouseClicked() {
     DRAW_LABELS = (DRAW_LABELS + 1) % 3;
    
   }  else if (mouseX > 200 && mouseX < 215 && mouseY > SCREEN_HEIGHT+4 && mouseY < SCREEN_HEIGHT+19) {
-    // Bright down checkbox  
-    if (BRIGHTNESS > 5) BRIGHTNESS -= 5;
+    // Bright down checkbox
+    BRIGHTNESS -= 5;  
+    if (BRIGHTNESS < 1) BRIGHTNESS = 1;
    
   } else if (mouseX > 200 && mouseX < 215 && mouseY > SCREEN_HEIGHT+22 && mouseY < SCREEN_HEIGHT+37) {
     // Bright up checkbox
