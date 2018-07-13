@@ -8,7 +8,7 @@
   Includes Tiling of
   Multiple Big Triangle Grids
   
-  7/17/17
+  7/8/18
   
   Built on glorious Hex Simulator
   
@@ -19,7 +19,7 @@
   both neighbors and linear movement easier. Turn on the coordinates
   to see the system.
   
-  Number of Big Triangles set by numBigTri. Each Big Triangles needs
+  Number of Big Triangles set by NUM_BIG_TRI. Each Big Triangles needs
   an (x,y) coordinate and a (L,R) connector designation. 
   
   Function included to translate x,y coordinates
@@ -28,16 +28,16 @@
   
 */
 
-int numBigTri = 6;  // Number of Big Triangles
+int NUM_BIG_TRI = 6;  // Number of Big Triangles
 
 // Relative coordinates for the Big Triangles
 int[][] BigTriCoord = {
-  {1,0},  // Strip 1
-  {2,0},  // Strip 2
-  {3,0},  // Strip 3
-  {1,1},  // Strip 4
-  {2,1},  // Strip 5
-  {3,1}   // Strip 6
+  {0,0},  // Strip 1
+  {1,1},  // Strip 2
+  {2,0},  // Strip 3
+  {4,0},  // Strip 4
+  {5,1},  // Strip 5
+  {6,0}   // Strip 6
 };
 
 // Matrix listing where the connector attaches physically
@@ -88,6 +88,7 @@ TestObserver testObserver;
 // Physical strip registry
 DeviceRegistry registry;
 List<Strip> strips = new ArrayList<Strip>();
+Strip[] strip_array = new Strip[NUM_BIG_TRI];
 
 int NONE = 9999;  // hack: "null" for "int'
 
@@ -102,6 +103,7 @@ int DRAW_LABELS = 2;
 // true means draw all the Big Triangles
 // false means all Big Triangles overlap
 boolean TILING = true;
+boolean UPDATE_VISUALIZER = true;  // turn false for LED-only updates
 
 int BRIGHTNESS = 100;  // A percentage
 
@@ -116,8 +118,9 @@ int NUM_PIXELS = TRI_GEN * TRI_GEN;
 // May improve performance and reduce flickering
 int buff_width = (int)(grid_width() * TRI_GEN * 2);  // x axis for buffer
 int buff_height = (int)(grid_height() * TRI_GEN);  // y axis for buffer
-int[][][] curr_buffer = new int[numBigTri][NUM_PIXELS][3];
-int[][][] next_buffer = new int[numBigTri][NUM_PIXELS][3];
+short[][][] curr_buffer = new short[NUM_BIG_TRI][NUM_PIXELS][3];
+short[][][] next_buffer = new short[NUM_BIG_TRI][NUM_PIXELS][3];
+short[][][] morph_buffer = new short[NUM_BIG_TRI][NUM_PIXELS][3];
 
 // Calculated pixel constants for simulator display
 int SCREEN_SIZE = 700;  // square screen
@@ -131,22 +134,14 @@ int CORNER_X = 10; // bottom left corner position on the screen
 int CORNER_Y = SCREEN_HEIGHT - 10; // bottom left corner position on the screen
 
 // Grid model(s) of Big Triangles
-TriForm[] triGrid = new TriForm[numBigTri];
+TriForm[] triGrid = new TriForm[NUM_BIG_TRI];
 
-//
-// Video variables
-//
-PImage movieFrame;            // The current movie frame
-//PImage displayFrame;          // What is displayed on the Triangles
-boolean VIDEO_STATE = false;  // Whether video is playing
-Movie myMovie;                // The current animated gif
-int movie_number;             // current movie number
-//int MOVIE_SIZE = 500;   // Maximum 500 x 500 pixel gif animations
-int PIX_DENSITY = 10;  // How many pixels wide is each little triangle
-int FRAME_WIDTH = (int)(grid_width() * PIX_DENSITY * TRI_GEN);
-int FRAME_HEIGHT = (int)(grid_height() * PIX_DENSITY * TRI_GEN);
-float[] movie_speeds = { 0.0, 0.2, 0.4, 0.75, 1.0, 1.5, 2.0, 3.0, 4.0, 5.0, 6.0 };
-String[] movie_titles = { "penguin", "Earth", "banana", "bluedot", "nyancat" };
+// Timing variables needed to control regular morphing
+int delay_time = 10000;  // delay time length in milliseconds (dummy initial value)
+long start_time = millis();  // start time point (in absolute time)
+long last_time = start_time;
+
+PFont font_triangle = createFont("Helvetica", 12, true);
 
 // Brute-force arrays of triangle numbers
 // used for rotations of the whole Triangle
@@ -179,7 +174,7 @@ int[] rotatecounter = {
   22 };
 
 //
-// Pixel Array routines
+// Helper classes: Coord & RGBColor
 //
 class Coord {
   public int x, y;
@@ -200,213 +195,68 @@ class RGBColor {
   }
 }
 
-class Pixel {
-  public int numitems;
-  public RGBColor pixcolor;
-  
-  Pixel() {
-    this.numitems = 0;
-    pixcolor = new RGBColor(0,0,0);
-  }
-  
-  void Empty() {
-    this.numitems = 0;
-    pixcolor = new RGBColor(0,0,0);
-  }
-}
-
-class PixelArray {
-  public int width;
-  public int height;
-  public Pixel[][] Pixels;
-  
-  PixelArray(int array_width, int array_height) {  // x,y
-    this.width = array_width;
-    this.height = array_height;
-    this.Pixels = new Pixel[array_width][array_height];
-    
-    for (int y = 0; y < array_height; y++) {
-      for (int x = 0; x < array_width; x++) {
-        Pixels[x][y] = new Pixel();
-      }
-    }
-    //BlackAllPixels();
-  }
-  
-  boolean IsValidCoord(int x, int y) {
-    if (x < 0 || x >= this.width || y < 0 || y >= this.height) {
-      return false;  // Out of range
-    } else {
-      return true;
-    }
-  }
-  
-  void EmptyAllPixels() {
-    for (int y = 0; y < this.height; y++) {
-      for (int x = 0; x < this.width; x++) {
-        Pixels[x][y].Empty();
-      }
-    }
-  }
-  
-  RGBColor GetPixelColor(int x, int y) {
-    if (IsValidCoord(x,y)) {
-      return Pixels[x][y].pixcolor;
-    } else {
-      RGBColor black = new RGBColor(0,0,0);
-      return black;
-    }
-  }
-     
-  void StuffPixelWithColor(int x, int y, RGBColor rgb) {
-    if (!IsValidCoord(x,y)) return;  // Out of range
-    
-    int numdata = Pixels[x][y].numitems;
-    if (numdata == 0) {  // First value in pixel. Stuff all of it.
-      this.Pixels[x][y].pixcolor = new RGBColor(rgb.r, rgb.g, rgb.b);
-    } else {  // Already values in hex. Do a weighted average with the new value.
-      this.Pixels[x][y].pixcolor = new RGBColor(
-        (rgb.r + (this.Pixels[x][y].pixcolor.r*numdata))/(numdata+1),
-        (rgb.g + (this.Pixels[x][y].pixcolor.g*numdata))/(numdata+1),
-        (rgb.b + (this.Pixels[x][y].pixcolor.b*numdata))/(numdata+1));
-    }
-    this.Pixels[x][y].numitems++;
-  }
-}
-
-// Buffer that holds [x][y] rectangular pixels
-PixelArray pixelarray;
-
+//
+// setup
+//
 void setup() {
+  
   size(SCREEN_WIDTH, SCREEN_HEIGHT + 50); // 50 for controls
   stroke(0);
   fill(255,255,0);
   
-  frameRate(10); // default 60 seems excessive
+  frameRate(60); // default 60 seems excessive
   
   // Set up the Big Triangles and stuff in the little triangles
-  for (int i = 0; i < numBigTri; i++) {
-    if (TILING) {  // Each Big Triangle has its own positioning
-      triGrid[i] = makeTriGrid(getBigX(i), getBigY(i), i);
-    } else {  // Draw all Big Triangles on top of each other at (0,0)
-      triGrid[i] = makeTriGrid(0,0,i);
-    }
+  for (int i = 0; i < NUM_BIG_TRI; i++) {
+    triGrid[i] = makeTriGrid(getBigX(i), getBigY(i), i);
   }
   
+  // Pixel Pusher stuff
   registry = new DeviceRegistry();
   testObserver = new TestObserver();
   registry.addObserver(testObserver);
   colorMode(RGB, 255);
-  frameRate(60);
   prepareExitHandler();
-  strips = registry.getStrips();  // Array of strips?
+  strips = registry.getStrips();
   
-  initializeColorBuffers();  // Stuff with zeros (all black)
+  initializeColorBuffers();  // Stuff curr/next/morph frames with zeros (all black)
   
-  // Image handling
-  pixelarray = new PixelArray(buff_width, buff_height);
-  
-  movieFrame = createImage(FRAME_WIDTH, FRAME_HEIGHT, RGB);
-  //movieFrame = createImage(MOVIE_SIZE, MOVIE_SIZE, RGB);
-  movie_number = int(random(movie_titles.length));  // Initial movie
+  background(200);
   
   _server = new Server(this, port);
   println("server listening:" + _server);
 }
 
+//
+// Draw - Main function
+//
 void draw() {
- 
-  background(200);
-  
+  print_memory_usage();
   drawBottomControls();
-  
-  // Draw each grid
-  for (int i = 0; i < numBigTri; i++) {
-    triGrid[i].draw();
-  }
-  // Draw a bold frame around each grid
-  if (TILING) {
-    for (int i = 0; i < numBigTri; i++) {
-      drawBigFrame(i);
-    }
-  }
-  
   pollServer();        // Get messages from python show runner
-  if (DRAW_LABELS == 0) drawGuides();  // Draw the red guides
-  if (VIDEO_STATE) {  // Is video on?
-    DumpMovieIntoPixels();
-    movePixelsToBuffer();
-    pixelarray.EmptyAllPixels();
+  update_morph();      // Morph between current frame and next frame
+  if (UPDATE_VISUALIZER) {
+    drawTriangles();     // Draw frames and triangles
   }
   sendDataToLights();  // Dump data into lights
   pushColorBuffer();   // Push the frame buffers
 }
 
-void DumpMovieIntoPixels() {
-  movieFrame.loadPixels();
-  //image(movieFrame, 0, 0);
-  // Iterate over background/main image pixel-by-pixel
-  // For each pixel, determine the triangular coordinate
-  // Width/height ratio is already properly scaled
-  for (int j = 0; j < movieFrame.height; j++) {
-    for (int i = 0; i < movieFrame.width; i++) {
-      Coord coord = GetPixelCoord(i, j, movieFrame.height, movieFrame.width);
-      if (!pixelarray.IsValidCoord(coord.x,coord.y)) continue;
-      
-      // Pull pixel location and color from picture
-      int imageloc = i + j*movieFrame.width;
-      RGBColor rgb = new RGBColor(red(movieFrame.pixels[imageloc]),
-                                 green(movieFrame.pixels[imageloc]),
-                                blue(movieFrame.pixels[imageloc]));
-                                
-      pixelarray.StuffPixelWithColor(coord.x, coord.y, rgb);
+void drawTriangles() {  
+  for (int i = 0; i < NUM_BIG_TRI; i++) {
+    triGrid[i].draw();  // Draw each grid
+    if (TILING) {
+      drawBigFrame(i);  // Draw a bold frame around each grid
     }
   }
-}
-
-void movieEvent(Movie m) {
-  boolean width_dominate = true;
-  
-  m.read();        // Get the next movie frame
-  m.loadPixels();  // Load frame into memory
-  
-  // Black out movieFrame - May need to restore this
-  /*
-  for (int i=0; i < movieFrame.pixels.length; i++) {
-    movieFrame.pixels[i] = color(0,0,0);
-  }
-  */
-  
-  // Is the "m" movie too wide?
-  if ( (m.width/m.height) > (FRAME_WIDTH / FRAME_HEIGHT) ) {
-    int new_height = int(movieFrame.width * m.height / m.width);
-    
-    movieFrame.copy(m,0,0,m.width,m.height, // (src,sx,sy,sw,sh
-      0, (movieFrame.height-new_height)/2,  // dx,dy
-      movieFrame.width,new_height);         // dw,dh) 
-
-  } else {  // No - make height the dominate value
-    int new_width = int(movieFrame.height * m.width / m.height);
-    
-    movieFrame.copy(m,0,0,m.width,m.height, // (src,sx,sy,sw,sh
-      (movieFrame.width-new_width)/2, 0,    // dx,dy 
-      new_width,movieFrame.height);         // dw,dh)
+  if (DRAW_LABELS == 0) {
+    drawGuides();  // Draw the red guides
   }
 }
 
-void turnOnMovie() {
-  String movieName = movie_titles[movie_number] + ".mov";
-  println("Starting " + movieName);
-  myMovie = new Movie(this, movieName);
-  myMovie.loop();
-}
-
-void nextMovie() {
-  myMovie.stop();
-  movie_number = (movie_number + 1) % movie_titles.length;
-  turnOnMovie();
-}
-
+//
+// Bottom Control functions
+//
 void drawCheckbox(int x, int y, int size, color fill, boolean checked) {
   stroke(0);
   fill(fill);  
@@ -446,40 +296,25 @@ void drawBottomControls() {
   drawCheckbox(380,SCREEN_HEIGHT+4,15, color(0,0,255), COLOR_STATE == 3);
   drawCheckbox(380,SCREEN_HEIGHT+22,15, color(0,0,255), COLOR_STATE == 6);
   
-  drawCheckbox(400,SCREEN_HEIGHT+10,20, color(255,255,255), COLOR_STATE == 0);
-  
-  drawCheckbox(480,SCREEN_HEIGHT+10,20, color(255,255,255), VIDEO_STATE); // Video
-  rect(600,SCREEN_HEIGHT+10,20,20);  // next gif box
-  
+  drawCheckbox(400,SCREEN_HEIGHT+10,20, color(255,255,255), COLOR_STATE == 0);  
   
   // draw text labels in 12-point Helvetica
   fill(0);
   textAlign(LEFT);
-  PFont f = createFont("Helvetica", 12, true);
-  textFont(f, 12);  
+  
+  textFont(font_triangle, 12);  
   text("Toggle Labels", 50, SCREEN_HEIGHT+25);
   
   text("-", 190, SCREEN_HEIGHT+16);
   text("+", 190, SCREEN_HEIGHT+34);
   text("Brightness", 225, SCREEN_HEIGHT+25);
-  textFont(f, 20);
+  textFont(font_triangle, 20);
   text(BRIGHTNESS, 150, SCREEN_HEIGHT+28);
   
-  textFont(f, 12);
+  textFont(font_triangle, 12);
   text("None", 305, SCREEN_HEIGHT+16);
   text("All", 318, SCREEN_HEIGHT+34);
-  text("Color", 430, SCREEN_HEIGHT+25);
-  text("Video", 505, SCREEN_HEIGHT+25);
-  text("Next", 565, SCREEN_HEIGHT+16);
-  text("gif", 570, SCREEN_HEIGHT+32);
-  
-  // scale font to size of triangles
-  int font_size = 12;  // default size
-  if (TRI_GEN >= 10) font_size = 8;  // smaller for small triangles
-  if (TRI_GEN <= 6) font_size = 12;  // bigger for fewer triangles
-  f = createFont("Helvetica", font_size, true);
-  textFont(f, font_size);
-  
+  text("Color", 430, SCREEN_HEIGHT+25); 
 }
 
 void mouseClicked() {  
@@ -525,78 +360,8 @@ void mouseClicked() {
     // All green  
     COLOR_STATE = 6;
     
-  }  else if (mouseX > 480 && mouseX < 500 && mouseY > SCREEN_HEIGHT+10 && mouseY < SCREEN_HEIGHT+30) {
-    // clicked video button
-    VIDEO_STATE = !VIDEO_STATE;
-    if (VIDEO_STATE) {
-      turnOnMovie();
-    } else {
-      myMovie.stop();
-    }
-   
-  } else if (mouseX > 600 && mouseX < 620 && mouseY > SCREEN_HEIGHT+10 && mouseY < SCREEN_HEIGHT+30) {
-    // clicked next gif button
-    if (VIDEO_STATE) nextMovie();
-   
   }
 }
-
-// Find the triangle coordinate of an x,y point
-
-Coord GetPixelCoord(int x, int y, int imageHeight, int imageWidth) {
-  // Calculate the size of each little triangle bin
-  float pix_height = imageHeight / buff_height;
-  float pix_width = imageWidth / buff_width;
-  
-  // y is easy. Flip in direction between processing and triangles have different 0's
-  int coord_y = (int)(y / pix_height);
-  int remain_y = y % round(pix_height);
-  
-  coord_y = (minBigY() * TRI_GEN) + (buff_height - coord_y - 1);
-  
-  // x is harder
-  int coord_x = (int)(x / pix_width);
-  //int coord_x = (minBigX() * TRI_GEN) + (int)(x / pix_width);
-  int remain_x = x % round(pix_width);
-  
-  if ((coord_x + coord_y) % 2 == 0) {
-    coord_x += bin_upward_diag(remain_x,remain_y,pix_width,pix_height);  // evens
-  } else {
-    coord_x += bin_downward_diag(remain_x,remain_y,pix_width,pix_height);  // odds
-  }
-  return (new Coord(coord_x,coord_y));
-}
-
-//
-// bin_upward_diag
-//
-// is the x value to the left or right of the diagonal made by
-// drawing a line from (0,0) to (x2,y2)
-// return -1 for left, 0 for right
-int bin_upward_diag(int x, int y, float x2, float y2) {
-  float x_line = y * x2/y2;
-  if (x > x_line) {
-    return 1;
-  } else {
-    return 0;
-  }
-}
-
-//
-// bin_downward_diag
-//
-// is the x value to the left or right of the diagonal made by
-// drawing a line from (0,y2) to (x2,0)
-// return -1 for left, 0 for right
-int bin_downward_diag(int x, int y, float x2, float y2) {
-  float x_line = x2 - ((x2 * y) / y2);
-  if (x > x_line) {
-    return 1;
-  } else {
-    return 0;
-  }
-}
-
 
 // Get helper functions
 //
@@ -613,8 +378,10 @@ char getLightDir(int grid) { return (connectors[grid][1]); }
 // Smallest BigX value
 int minBigX() {
   int min_x = getBigX(0);
-  for (int i=1; i<numBigTri; i++) {
-    if (getBigX(i) < min_x) min_x = getBigX(i);
+  for (int i = 1; i < NUM_BIG_TRI; i++) {
+    if (getBigX(i) < min_x) {
+      min_x = getBigX(i);
+    }
   }
   return min_x;
 }
@@ -625,8 +392,10 @@ int minBigX() {
 // Smallest BigY value
 int minBigY() {
   int min_y = getBigY(0);
-  for (int i=1; i<numBigTri; i++) {
-    if (getBigY(i) < min_y) min_y = getBigY(i);
+  for (int i = 1; i < NUM_BIG_TRI; i++) {
+    if (getBigY(i) < min_y) {
+      min_y = getBigY(i);
+    }
   }
   return min_y;
 }
@@ -637,16 +406,18 @@ int minBigY() {
 // How many triangles across is the big grid?
 float grid_width() {
   
-  if (TILING == false) return 1;  // Want just one grid
+  if (TILING == false) {
+    return 1;  // Want just one grid
+  }
   
   int min_x = getBigX(0);
   int max_x = min_x;
   int new_x;
   
-  for (int i=1; i<numBigTri; i++) {
+  for (int i=1; i<NUM_BIG_TRI; i++) {
     new_x = getBigX(i);
-    if (new_x < min_x) min_x = new_x;
-    if (new_x > max_x) max_x = new_x;
+    if (new_x < min_x) { min_x = new_x; }
+    if (new_x > max_x) { max_x = new_x; }
   }
   return (max_x - min_x + 2) / 2.0;  // 2 is because of up/down
 }
@@ -657,16 +428,18 @@ float grid_width() {
 // How many triangles high is the big grid?
 int grid_height() {
   
-  if (TILING == false) return 1;
+  if (TILING == false) {
+    return 1;
+  }
   
   int min_y = getBigY(0);
   int max_y = min_y;
   int new_y;
   
-  for (int i=1; i<numBigTri; i++) {
+  for (int i = 1; i < NUM_BIG_TRI; i++) {
     new_y = getBigY(i);
-    if (new_y < min_y) min_y = new_y;
-    if (new_y > max_y) max_y = new_y;
+    if (new_y < min_y) { min_y = new_y; }
+    if (new_y > max_y) { max_y = new_y; }
   }
   return (max_y - min_y + 1);
 }
@@ -677,7 +450,7 @@ int grid_height() {
 // Checks to see whether (x,y) is in the grid specified
 boolean IsCoordinGrid(int x, int y, int grid) {
   // Check grid bounds
-  if (grid < 0 || grid >= numBigTri) {
+  if (grid < 0 || grid >= NUM_BIG_TRI) {
     return (false);
   }
   
@@ -704,7 +477,6 @@ boolean IsCoordinGrid(int x, int y, int grid) {
 // Converts an x,y triangle coordinate into a light number
 // for grid number grid
 //
-
 int GetLightFromCoord(int x, int y, int grid) {
   if (IsCoordinGrid(x,y,grid) == false) return (NONE);
   
@@ -781,15 +553,16 @@ boolean isPointUp(int x, int y) {
   }
 }
 
+//
 // How many lights on a row?
-
+//
 int rowWidth(int row) {
   return ((TRI_GEN-row-1)*2)+1;
 }
 
 TriForm makeTriGrid(int big_x, int big_y, int big_num) {
   
-  TriForm form = new TriForm();
+  TriForm form = new TriForm(TRI_GEN * TRI_GEN);
   
   boolean up = isPointUp(big_x,big_y);
    
@@ -822,7 +595,8 @@ TriForm makeTriGrid(int big_x, int big_y, int big_num) {
       } else {
         ycoord -= y;
       }
-      form.add(new Tri(pix_x,pix_y, xcoord,ycoord, big_num));
+      int led = GetLightFromCoord(xcoord, ycoord, big_num);
+      form.add(new Tri(pix_x,pix_y, xcoord,ycoord, big_num, led), led);
     }
   }
   return form;  
@@ -830,48 +604,36 @@ TriForm makeTriGrid(int big_x, int big_y, int big_num) {
 
 
 class TriForm {
-  ArrayList<Tri> tris;
+  Tri[] tris;
+  int size;
   
-  TriForm() {
-    tris = new ArrayList<Tri>();
+  TriForm(int num_pixels) {
+    tris = new Tri[num_pixels];
+    this.size = num_pixels;
   }
   
-  void add(Tri t) {
-    int triId = tris.size();
-    tris.add(t);
-  }
-  
-  int size() {
-    return tris.size();
+  void add(Tri t, int led) {
+    if (led < this.size) {
+      this.tris[led] = t;
+    }
   }
   
   void draw() {
-    for (Tri t : tris) {
-      t.draw();
+    for (int i = 0; i < this.size; i++) {
+      this.tris[i].draw();
     }
   }
   
-  // Reworked for iterative search (SD) XXX probably need a better API here!
   void setCellColor(color c, int i) {
-    if (i >= tris.size()) {
-      println("invalid offset for TriForm.setColor: i only have " + tris.size() + " triangles");
-      return;
+    if (i < this.size) {
+      this.tris[i].setColor(c);
     }
-    for (Tri t : tris) {  // Search all 
-      if (i == t.LED) {  // for the one that has the correct LED#
-        t.setColor(c);
-        return;
-      }
-    }
-    println("Could not find LED #"+i);
-  }
-    
+  }    
 }
 
-/*
- *  Triangle shape primitives
- */
-
+//
+//  Triangle shape primitives
+//
 public float triHeight(int size) {
   return sqrt(3)/2 * size;
 }
@@ -887,13 +649,13 @@ class Tri {
   int LED;     // LED number on the strand
   color c;
   
-  Tri(int pix_x, int pix_y, int xcoord, int ycoord, int big_num) {
+  Tri(int pix_x, int pix_y, int xcoord, int ycoord, int big_num, int led) {
     this.x = pix_x;
     this.y = pix_y;
     this.xcoord = xcoord;
     this.ycoord = ycoord;
     this.big_num = big_num;
-    this.LED = GetLightFromCoord(this.xcoord, this.ycoord, big_num);
+    this.LED = led;
     this.c = color(255,255,255);
     
     // str(xcoord + ", " + ycoord)
@@ -957,7 +719,7 @@ class Tri {
 
 void drawBigFrame(int grid) {
   // Check bounds
-  if (grid < 0 || grid > numBigTri) return;  // Out of bounds
+  if (grid < 0 || grid > NUM_BIG_TRI) return;  // Out of bounds
   
   int x = getBigX(grid);
   int y = getBigY(grid);
@@ -977,13 +739,14 @@ void drawBigFrame(int grid) {
 // as a way to check orientation
 //
 void drawGuides() {
-  int r = 255;
-  int g = 0;
-  int b = 0;
-  for (int grid = 0; grid < numBigTri; grid++) {
-    for (int pix = 0; pix < TRI_GEN; pix++) {  // half a row
-      triGrid[grid].setCellColor(color(r,g,b), pix);  // Simulator
-      setPixelBuffer(grid, pix, r, g, b);  // Lights 
+  short r = 255;
+  short g = 0;
+  short b = 0;
+  
+  for (byte t = 0; t < NUM_BIG_TRI; t++) {
+    for (int p = 0; p < TRI_GEN; p++) {  // half a row
+      triGrid[t].setCellColor(color(r,g,b), p);  // Simulator
+      setPixelBuffer(t, p, r, g, b, false);  // Lights 
     }
   }
 }
@@ -1006,7 +769,6 @@ void drawTriangle(int x, int y, int size, boolean up) {
 //
 //  Server Routines
 //
-
 void pollServer() {
   try {
     Client c = _server.available();
@@ -1031,73 +793,71 @@ void pollServer() {
 }
 
 Pattern cmd_pattern = Pattern.compile("^\\s*(\\d+),(\\d+),(\\d+),(\\d+),(\\d+)\\s*$");
-Pattern osc_pattern = Pattern.compile("^\\s*(\\w+),(\\w+),(\\d+)\\s*$");
 
+
+//
+// 2 wildcard commands:
+//
+// X = Finish a morph cycle (clean up by pushing the frame buffers)
+// D(int) means delay for int milliseconds (but keeping morphing)
+//
+// Otherwise, process 5 integers as (s,i, r,g,b)
+//
 void processCommand(String cmd) {
-  Matcher m = cmd_pattern.matcher(cmd);  // For RGB commands
-  Matcher o = osc_pattern.matcher(cmd);  // For OSC commands
-  
-  if (m.find()) {
-    Process_RGB_command(m);
-  } else if (o.find()) {
-    Process_OSC_command(o);
-  } else {
-    println(cmd);
+  if (cmd.charAt(0) == 'X') {  // Finish the cycle
+    finishCycle();
+  } else if (cmd.charAt(0) == 'D') {  // Get the delay time
+    delay_time = Integer.valueOf(cmd.substring(1, cmd.length()));
+  } else {  
+    processPixelCommand(cmd);  // Pixel command
+  }
+}
+
+void processPixelCommand(String cmd) {
+  Matcher m = cmd_pattern.matcher(cmd);
+  if (!m.find()) {
+    //println(cmd);
     println("ignoring input!");
     return;
   }
+  byte t    =    Byte.valueOf(m.group(1));
+  int p     = Integer.valueOf(m.group(2));
+  int r     = Integer.valueOf(m.group(3));
+  int g     = Integer.valueOf(m.group(4));
+  int b     = Integer.valueOf(m.group(5));
+  
+  sendColorOut(t, p, (short)r, (short)g, (short)b, false);  
+//  println(String.format("setting pixel:%d,%d to r:%d, g:%d, b:%d", s, i, r, g, b));
 }
 
-void Process_RGB_command(Matcher m) {
-  if (VIDEO_STATE) return;  // Videos override python shows
-  
-  int tri  = Integer.valueOf(m.group(1));
-  int pix  = Integer.valueOf(m.group(2));
-  int r    = Integer.valueOf(m.group(3));
-  int g    = Integer.valueOf(m.group(4));
-  int b    = Integer.valueOf(m.group(5));
-  
-  //println(String.format("setting pixel:%d,%d to r:%d g:%d b:%d", tri, pix, r, g, b));
-  
-  color correct = colorCorrect(r,g,b);
-  
-  r = adj_brightness(red(correct));
-  g = adj_brightness(green(correct));
-  b = adj_brightness(blue(correct));
-  
-  triGrid[tri].setCellColor(color(r,g,b), pix);  // Simulator
-  setPixelBuffer(tri, pix, r, g, b);  // Lights 
-  
-  return;
+//
+// Finish Cycle
+//
+// Get ready for the next morph cycle by morphing to the max and pushing the frame buffer
+//
+void finishCycle() {
+//  morph_frame(1.0);  // Causes jerky animations (removed)
+  pushColorBuffer();
+  start_time = last_time;  // = millis(); // reset the clock
 }
 
-void Process_OSC_command(Matcher o) {
-  String osc  = String.valueOf(o.group(1));
-  String cmd  = String.valueOf(o.group(2));
-  int value   = Integer.valueOf(o.group(3));
-  
-  if (!osc.equals("OSC")) {
-    println("Did not receive an OSC header for: %s, %s, %d", osc, cmd, value);
-  } else {
-    if (cmd.equals("color")) {
-      COLOR_STATE = value;
-    } else if (cmd.equals("brightness")) {
-      BRIGHTNESS = value;
-    } else if (cmd.equals("video")) {
-      VIDEO_STATE = !VIDEO_STATE;
-      if (VIDEO_STATE == true) turnOnMovie();
-    } else if (cmd.equals("nextvideo")) {
-      nextMovie();
-    } else if (cmd.equals("speed")) {
-      if (VIDEO_STATE) myMovie.speed(movie_speeds[value]);
-    }
-  }
+//
+// Update Morph
+//
+void update_morph() {
+  // Fractional morph over the span of delay_time
+  last_time = millis();  // update clock
+  float fract = (last_time - start_time) / (float)delay_time;
+  if (fract <= 1.0) {
+    morph_frame(fract);
+  } 
 }
 
 //
 //  Routines to interact with the Lights
 //
 
+/* DEPRECATED - Likely will cause trouble
 void movePixelsToBuffer() {
   
   int x_offset = minBigX() * TRI_GEN;
@@ -1105,7 +865,7 @@ void movePixelsToBuffer() {
   
   for (int y = 0; y < buff_height; y++) {  // rows
     for (int x = 0; x < buff_width; x++) {  // columns
-      for (int grid = 0; grid < numBigTri; grid++) {  // Big Triangles
+      for (int grid = 0; grid < NUM_BIG_TRI; grid++) {  // Big Triangles
         if (IsCoordinGrid(x+x_offset, y+y_offset, grid)) {
           int pix = GetLightFromCoord(x+x_offset,y+y_offset,grid);
           if (pix != NONE) {
@@ -1122,27 +882,50 @@ void movePixelsToBuffer() {
     }
   }
 }
+*/
+
+// Send a corrected color to a triangle pixel on screen and in lights
+void sendColorOut(byte t, int p, short r, short g, short b, boolean morph) {
+  color correct = colorCorrect(r,g,b);  // all-red, all-blue, etc.
+  
+  r = (short)red(correct);
+  g = (short)green(correct);
+  b = (short)blue(correct);
+  
+  if (TILING) {
+    triGrid[t].setCellColor(color(r,g,b), p);  // Simulator
+    setPixelBuffer(t, p, r, g, b, morph);  // Lights: sets next-frame buffer (doesn't turn them on)
+  } else {
+    if (t == 0) {
+      for (byte t_num = 0; t_num < NUM_BIG_TRI; t_num++) {
+        triGrid[t_num].setCellColor(color(r,g,b), p);  // Simulator
+        setPixelBuffer(t, p, r, g, b, morph);  // Lights: sets next-frame buffer (doesn't turn them on)
+      }
+    }
+  }
+}
 
 void sendDataToLights() {
-  int BigTri, pixel;
+  byte t;
+  int p;
   
   if (testObserver.hasStrips) {   
     registry.startPushing();
-    registry.setExtraDelay(0);
+    registry.setExtraDelay(10);
     registry.setAutoThrottle(true);
     registry.setAntiLog(true);    
     
     List<Strip> strips = registry.getStrips();
-    BigTri = 0;
+    t = 0;
     
     for (Strip strip : strips) {      
-      for (pixel = 0; pixel < NUM_PIXELS; pixel++) {
-         if (hasChanged(BigTri,pixel)) {
-           strip.setPixel(getPixelBuffer(BigTri,pixel), pixel);
+      for (p = 0; p < NUM_PIXELS; p++) {
+         if (hasChanged(t,p)) {
+           strip.setPixel(getPixelBuffer(t, p), p);
          }
       }
-      BigTri++;
-      if (BigTri >=numBigTri) break;  // Prevents buffer overflow
+      t++;
+      if (t >= NUM_BIG_TRI) break;  // Prevents buffer overflow
     }
   }
 }
@@ -1157,7 +940,7 @@ private void prepareExitHandler () {
 
       List<Strip> strips = registry.getStrips();
       for (Strip strip : strips) {
-        for (int i=0; i<strip.getLength(); i++)
+        for (int i = 0; i < strip.getLength(); i++)
           strip.setPixel(#000000, i);
       }
       for (int i=0; i<100000; i++)
@@ -1170,9 +953,37 @@ private void prepareExitHandler () {
 //
 //  Routines for the strip buffer
 //
+//  Fractional morphing between current and next frame - sends data to lights
+//
+//  fract is an 0.0 - 1.0 fraction towards the next frame
+//
+void morph_frame(float fract) {
+  color c1, c2, interp;
+  short r,g,b;
+  
+  for (byte t = 0; t < NUM_BIG_TRI; t++) {
+    for (int p = 0; p < NUM_PIXELS; p++) {
+      c1 = color(curr_buffer[t][p][0], curr_buffer[t][p][1], curr_buffer[t][p][2]);
+      c2 = color(next_buffer[t][p][0], next_buffer[t][p][1], next_buffer[t][p][2]);      
+      
+      interp = lerpColor(c1, c2, fract);
+      
+      r = (short)(interp >> 16 & 0xFF);
+      g = (short)(interp >> 8 & 0xFF);
+      b = (short)(interp & 0xFF);
+      
+      sendColorOut(t,p, r,g,b, true);
+    }
+  }
+}
 
-int adj_brightness(float value) {
-  return (int)(value * BRIGHTNESS / 100);
+color adj_brightness(color c, int brightness) {
+  if (brightness == 100) {
+    return c;  // No adjustment needed at full brightness
+  }
+  return color(  red(c) * brightness / 100.0,
+               green(c) * brightness / 100.0,
+                blue(c) * brightness / 100.0);
 }
 
 color colorCorrect(int r, int g, int b) {
@@ -1256,33 +1067,34 @@ color colorCorrect(int r, int g, int b) {
 }
 
 void initializeColorBuffers() {
-  for (int t = 0; t < numBigTri; t++) {
+  short empty = 0;
+  for (byte t = 0; t < NUM_BIG_TRI; t++) {
     for (int p = 0; p < NUM_PIXELS; p++) {
-      setPixelBuffer(t, p, 0,0,0);
+      setPixelBuffer(t, p, empty,empty,empty, false);
     }
   }
   pushColorBuffer();
 }
 
-void setPixelBuffer(int BigTri, int pixel, int r, int g, int b) {
-  BigTri = bounds(BigTri, 0, numBigTri-1);
-  pixel = bounds(pixel, 0, NUM_PIXELS-1);
-  
-  next_buffer[BigTri][pixel][0] = r;
-  next_buffer[BigTri][pixel][1] = g;
-  next_buffer[BigTri][pixel][2] = b;
+void setPixelBuffer(byte t, int p, short r, short g, short b, boolean morph) {
+  if (morph) {
+    morph_buffer[t][p][0] = r;
+    morph_buffer[t][p][1] = g;
+    morph_buffer[t][p][2] = b;
+  } else {
+    next_buffer[t][p][0] = r;
+    next_buffer[t][p][1] = g;
+    next_buffer[t][p][2] = b;
+  }
 }
 
-color getPixelBuffer(int BigTri, int pixel) {
-  BigTri = bounds(BigTri, 0, numBigTri-1);
-  pixel = bounds(pixel, 0, NUM_PIXELS-1);
-  
-  return color(next_buffer[BigTri][pixel][0],
-               next_buffer[BigTri][pixel][1],
-               next_buffer[BigTri][pixel][2]);
+color getPixelBuffer(byte t, int p) {
+  return color(morph_buffer[t][p][0],
+               morph_buffer[t][p][1],
+               morph_buffer[t][p][2]);
 }
 
-boolean hasChanged(int t, int p) {
+boolean hasChanged(byte t, int p) {
   if (curr_buffer[t][p][0] != next_buffer[t][p][0] ||
       curr_buffer[t][p][1] != next_buffer[t][p][1] ||
       curr_buffer[t][p][2] != next_buffer[t][p][2]) {
@@ -1293,7 +1105,7 @@ boolean hasChanged(int t, int p) {
 }
 
 void pushColorBuffer() {
-  for (int t = 0; t < numBigTri; t++) {
+  for (byte t = 0; t < NUM_BIG_TRI; t++) {
     for (int p = 0; p < NUM_PIXELS; p++) {
       curr_buffer[t][p][0] = next_buffer[t][p][0];
       curr_buffer[t][p][1] = next_buffer[t][p][1];
@@ -1302,12 +1114,36 @@ void pushColorBuffer() {
   }
 }
 
-int bounds(int value, int minimun, int maximum) {
-  if (value < minimun) return minimun;
-  if (value > maximum) return maximum;
-  return value;
+/*
+// Deprecated - intent here to load connector map from mapping.csv
+//
+// Problem: can only do this in setup() but I need the map even before setp
+void load_connectors() {
+  String[] lines = loadStrings("mapping.csv");
+  
+  NUM_BIG_TRI = lines.length - 1;  // Line 0 is a header
+  
+  for (byte i = 1 ; i < lines.length; i++) {
+    String[] list = split(lines[i], ",");
+    BigTriCoord[i][0] = int(list[0]);
+    BigTriCoord[i][1] = int(list[1]);
+    connectors[i][0] = char(list[2]);
+    connectors[i][1] = char(list[3]);
+  }
 }
-    
+*/
+
+void print_memory_usage() {
+  long maxMemory = Runtime.getRuntime().maxMemory();
+  long allocatedMemory = Runtime.getRuntime().totalMemory();
+  long freeMemory = Runtime.getRuntime().freeMemory();
+  int inUseMb = int(allocatedMemory / 1000000);
+  
+  if (inUseMb > 80) {
+    println("Memory in use: " + inUseMb + "Mb");
+  }  
+}
+ 
   
   
 

@@ -13,14 +13,11 @@ class Trail(object):
 		self.tri.set_cell(self.pos, gradient_wheel(self.color, self.intense))
 	
 	def fade_trail(self):
-		
 		self.pos = near_neighbor(self.pos, self.center)
-		self.intense *= 0.9
-		if self.intense > 0.05:
-			return True
-		else:
-			return False		
-       		
+		self.intense -= 0.1
+		return self.intense > 0.2
+
+
 class Planet(object):
 	def __init__(self, trimodel, pos, color, dir, center):
 		self.tri = trimodel
@@ -40,17 +37,14 @@ class Planet(object):
 		
 		for i in range(2):
 			for c in get_ring(self.pos, i):	
-				self.draw_add_trail(self.color, 1-(0.07*i), c, self.center)
+				self.draw_add_trail(self.color, 1 - (0.07 * i), c, self.center)
 	
 	def move_planet(self):
 		self.pos = tri_in_direction(self.pos, self.dir, 2)
 		self.arc_count -= 1
 		if self.arc_count == 0:
 			self.arc_count = self.arc
-			if self.rotation == 0:
-				self.dir = turn_left(self.dir)
-			else:
-				self.dir = turn_right(self.dir)
+			self.dir = turn_left(self.dir) if self.rotation == 0 else turn_right(self.dir)
 		
 	def draw_add_trail(self, color, intense, pos, center):
 		if self.tri.cell_exists(pos):
@@ -59,9 +53,9 @@ class Planet(object):
 			self.trails.append(new_trail)
 	
 	def fade_trails(self):
-		for t in reversed(self.trails):	# Plot last-in first
+		for t in self.trails:	 # Plot last-in first
 			t.draw_trail()
-			if t.fade_trail() == False:
+			if not t.fade_trail():
 				self.trails.remove(t)
 			
 				
@@ -88,11 +82,10 @@ class Circling(object):
 			
 		while (True):
 			
-			# Set background to black
-			self.tri.set_all_cells((0,0,0))
+			self.tri.black_all_cells()
 			
 			for p in self.planets:
 				p.draw_planet()
 				p.move_planet()
 			
-			yield self.speed  	# random time set in init function
+			yield self.speed

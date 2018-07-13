@@ -37,11 +37,11 @@ class Branches(object):
 			# Check how many branches are in play
 			# If no branches, add one. If branches < 10, add more branches randomly
 			while len(self.livebranches) < 10 or oneIn(10):
-				newbranch = Branch(self.tri,
-					randColorRange(self.maincolor, 30), # color
-					choice(all_edges()), # Starting position on outside ring
-					self.maindir, # Random initial direction
-					0)		# Life = 0 (new branch)
+				newbranch = Branch(trimodel=self.tri,
+								   color=randColorRange(self.maincolor, 30),
+								   pos=choice(all_edges()),
+								   dir=self.maindir,
+								   life=0)		# Life = 0 (new branch)
 				self.livebranches.append(newbranch)
 				
 			for b in self.livebranches:

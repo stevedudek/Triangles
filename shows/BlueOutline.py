@@ -1,4 +1,3 @@
-from HelperFunctions import*
 from triangle import*
         		
 class BlueOutline(object):

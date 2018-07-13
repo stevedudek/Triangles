@@ -1,16 +1,18 @@
 #!/usr/bin/env python2.7
 import sys
 import time
+import resource
 import traceback
 import Queue
 import threading
-import signal
 
 import triangle
 import shows
 import util
 
 # import cherrypy
+
+SPEED_MULT = 2  # Multiply every delay by this value. Higher = much slower shows
 
 def speed_interpolation(val):
     """
@@ -51,9 +53,6 @@ class ShowRunner(threading.Thread):
         self.framegen = None
 
         # current show parameters
-
-        # video is off at the stop
-        self.video = False
 
         # show speed multiplier - ranges from 0.1 to 10
         # 1.0 is normal speed
@@ -112,18 +111,8 @@ class ShowRunner(threading.Thread):
             (ns, cmd) = addr[1:].split('/')
             if ns == '1':
                 # control command
-                if cmd == 'video':
-                    self.video = not self.video
-                    self.send_OSC_cmd('video', 0)
+                if cmd == 'next':
                     if self.video:
-                        print "turning video on"
-                    else:
-                        print "turning video off"                    
-                elif cmd == 'next':
-                    if self.video:
-                        print "next video"
-                        self.send_OSC_cmd('nextvideo', 0)
-                    else:
                         print "next show"
                         self.next_show()
                 elif cmd == 'previous':
@@ -167,9 +156,8 @@ class ShowRunner(threading.Thread):
 
         self.clear()
         self.prev_show = self.show
-
         self.show = s(self.model)
-        print "next show:" + self.show.name
+        print "next show: " + self.show.name
         self.framegen = self.show.next_frame()
         self.show_params = hasattr(self.show, 'set_param')
         self.show_runtime = 0
@@ -189,16 +177,35 @@ class ShowRunner(threading.Thread):
             try:
                 self.check_queue()
 
-                d = self.get_next_frame()
-                self.model.go()
-                if d:
-                    real_d = d * self.speed_x
-                    time.sleep(real_d)
-                    self.show_runtime += real_d
+                delay = self.get_next_frame()
+
+                # # Print python heap size
+                # megabytes = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1000000
+                # if megabytes > 30:
+                #     print "Using: {}Mb".format(megabytes)
+
+                if delay:
+                    adj_delay = delay * SPEED_MULT
+
+                    # Fade in & fade out shows
+                    fade_time = 3  # In seconds. Adjust fade_time here
+
+                    if self.show_runtime < fade_time:
+                        fract = float(self.show_runtime) / fade_time
+                    elif self.show_runtime > (self.max_show_time - fade_time):
+                        fract = float(self.max_show_time - self.show_runtime) / fade_time
+                    else:
+                        fract = 1   # default: no fade
+
+                    # Send all the next_frame data - don't change lights
+                    self.model.go(fract)
+                    self.model.send_delay(adj_delay)
+
+                    time.sleep(adj_delay)  # The only delay!
+
+                    self.show_runtime += adj_delay
                     if self.show_runtime > self.max_show_time:
                         print "max show time elapsed, changing shows"
-                        # self.queue.put("run_show:") #next_show
-                        # self.queue.put("clear") #next_show
                         self.next_show()
                 else:
                     print "show is out of frames, waiting..."
@@ -260,9 +267,7 @@ class TriangleServer(object):
         try:
             if self.osc_thread:
                 self.osc_thread.start()
-
             self.runner.start()
-
             self.running = True
         except Exception, e:
             print "Exception starting Triangles!"
@@ -353,8 +358,8 @@ if __name__=='__main__':
     import argparse
     parser = argparse.ArgumentParser(description='Triangles Light Control')
 
-    parser.add_argument('--max-time', type=float, default=float(180),
-                        help='Maximum number of seconds a show will run (default 180)')
+    parser.add_argument('--max-time', type=float, default=float(30),
+                        help='Maximum number of seconds a show will run (default 30)')
 
     # Simulator must run to turn on lights
     # parser.add_argument('--simulator',dest='simulator',action='store_true')

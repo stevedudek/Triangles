@@ -11,17 +11,15 @@ class Ball(object):
 		self.life = randint(50,200)	# how long a ball is around
 
 	def decrease_life(self):
-		if self.life > 0:
-			self.life -= 1
-			return True
-		else:
-			return False
+		self.life -= 1
+
+	def is_alive(self):
+		return self.life >= 0
 	
 	def draw_ball(self):
 		self.tri.set_cell(self.pos, wheel(self.color))	# Draw the center
 		for i in range (self.size):
-			self.tri.set_cells(get_ring(self.pos, i),
-				gradient_wheel(self.color, 1-(0.15*(i+1))))
+			self.tri.set_cells(get_ring(self.pos, i), gradient_wheel(self.color, 1-(0.15*(i+1))))
 	
 	def move_ball(self):
 		tries = 20
@@ -55,15 +53,15 @@ class Balls(object):
 				newball = Ball(self.tri, self.maincolor)
 				self.balls.append(newball)
 			
-			# Black the screen
-			self.tri.set_all_cells([0,0,0])
+			self.tri.black_all_cells()
 
-			# Draw all the balls
-			# Move balls. Kill ball if out of life
 			for b in self.balls:
 				b.draw_ball()
 				b.move_ball()
-				if b.decrease_life() == False:
+				b.decrease_life()
+
+			for b in self.balls:
+				if not b.is_alive():
 					self.balls.remove(b)
 			
 			yield self.speed  	# random time set in init function

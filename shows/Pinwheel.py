@@ -7,12 +7,12 @@ class Pinwheel(object):
 		self.color = color
 		self.pos = pos
 		self.dir = dir
-		self.life = life	# How long the branch has been around
+		self.life = life
 
 	def draw_pinwheel(self):
 		if self.tri.cell_exists(self.pos):
-			self.tri.set_cells(self.tri.mirror_coords(self.pos),
-				gradient_wheel(self.color, 1 - self.life/80.0))
+			color = gradient_wheel(self.color, 1 - self.life / 80.0)
+			self.tri.set_cells(self.tri.mirror_coords(self.pos), color)
 							
 		# Random chance that path changes - spirals only in one direction
 		if oneIn(2):
@@ -30,9 +30,9 @@ class Pinwheel(object):
 				
 class Pinwheels(object):
 	def __init__(self, trimodel):
-		self.name = "Pinwheel"        
+		self.name = "Pinwheels"
 		self.tri = trimodel
-		self.livepinwheels = []	# List that holds Pinwheel objects
+		self.pinwheels = []	# List that holds Pinwheel objects
 		self.speed = 0.1
 		self.maincolor =  randColor()	# Main color of the show
 		          
@@ -43,27 +43,25 @@ class Pinwheels(object):
 		while (True):
 			
 			# Randomly add pinwheel
-			
-			while len(self.livepinwheels) < 6 or oneIn(8):
-				newpinwheel = Pinwheel(self.tri,
-						self.maincolor, 		
-						self.tri.get_rand_cell(), 	# random placement
-						2, 						# Always heading southeast
-						0)						# Life = 0 (new pinwheel)
-				self.livepinwheels.append(newpinwheel)
+			while len(self.pinwheels) < 6 or oneIn(8):
+				newpinwheel = Pinwheel(trimodel=self.tri,
+									   color=self.maincolor,
+									   pos=self.tri.get_rand_cell(),
+									   dir=2,
+									   life=0)
+				self.pinwheels.append(newpinwheel)
+				self.maincolor = randColorRange(self.maincolor, 100)
 				
-			for p in self.livepinwheels:
+			for p in self.pinwheels:
 				p.draw_pinwheel()
 				
 				# Chance for branching
 				if oneIn(50):	# Create a fork
 					newdir = turn_left(p.dir) # always fork left
-					newpinwheel = Pinwheel(self.tri, p.color, p.pos, newdir, p.life)
-					self.livepinwheels.append(newpinwheel)
+					newpinwheel = Pinwheel(trimodel=self.tri, color=p.color, pos=p.pos, dir=newdir, life=p.life)
+					self.pinwheels.append(newpinwheel)
 					
-				if p.move_pinwheel() == False:	# pinwheel has moved off the board
-					self.livepinwheels.remove(p)	# kill the branch
-			
-			self.maincolor = (self.maincolor + 3) % maxColor
+				if not p.move_pinwheel():	# pinwheel has moved off the board
+					self.pinwheels.remove(p)	# kill the branch
 					
 			yield self.speed  	# random time set in init function

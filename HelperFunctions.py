@@ -18,6 +18,27 @@ def oneIn(chance):
 		return True
 	else:
 		return False
+
+# Return either 1 or -1
+def plusORminus():
+	return (randint(0,1) * 2) - 1
+
+# Increase or Decrease a counter with a range
+def upORdown(value, amount, min, max):
+	value += (amount * plusORminus())
+	return bounds(value, min, max)
+
+# Increase/Decrease a counter within a range
+def inc(value, increase, min, max):
+	value += increase
+	return bounds(value, min, max)
+
+def bounds(value, min, max):
+	if value < min:
+		value = min
+	if value > max:
+		value = max
+	return value
 		
 # Get a random direction
 def randDir():
@@ -35,18 +56,14 @@ def turn_right(dir):
 def turn_left_or_right(dir):
 	return (maxDir + dir + randint(-1,1) ) % maxDir
 
-# In Bounds: hack for the Hourglass geometry. Creates a fram
+# In Bounds: hack for the Hourglass geometry. Creates a frame.
 def in_bounds(coord):
 	(x,y) = coord
-	if x >= 0 and x <= 46 and y >= 0 and y <= 23:
-		return True
-	else:
-		return False
+	return x >= 0 and x <= 46 and y >= 0 and y <= 23
 
 #
 # Distance Functions
 #
-
 def distance(coord1, coord2):
 	(x1,y1) = coord1
 	(x2,y2) = coord2
@@ -56,18 +73,18 @@ def rect_coord(coord):
 	"Return the precise, calculated rectilinear coordinates"
 	(x,y) = coord
 	return ( (x/2.0)+0.5, (y*0.866)+0.5 )
+
 #
 # Color Functions
 #
-	
 # Pick a random color
 def randColor():
 	return randint(0,maxColor-1)
 	
 # Returns a random color around a given color within a particular range
-# Function is good for selecting blues, for xeample
+# Function is good for selecting blues, for example
 def randColorRange(color, window):
-	return (maxColor + color + randint(-window,window)) % maxColor
+	return (maxColor + color + randint(int(-window),int(window))) % maxColor
 
 # Wrapper for gradient_wheel in which the intensity is 1.0 (full)
 def wheel(color):

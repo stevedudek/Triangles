@@ -7,37 +7,30 @@ class SwirlingCenter(object):
 		self.name = "SwirlingCenter"        
 		self.tri = trimodel
 		self.time = 0
-		self.speed = 0.2
-		self.width = 12
+		self.speed = 0.05
+		self.width = randint(1,8)
 		self.color = randColor()
 
 	def get_att(self, width, ring, time):
-		saw = (1.0 / width) * (ring + (time % 1000))	# Linear sawtooth
-		while saw >= 2: saw = saw - 2	# Cut into sawtooth periods
-		if saw > 1: saw = 2 - saw	# Descending part of sawtooth
-		return saw
+		return (sin(2 * 3.1415 * ((ring + time) % width) / width) + 1) * 0.5
 
 	def next_frame(self):
 
 		while (True):
 			
 			self.draw_nested_triangles()
-			
+			self.color = randColorRange(self.color, 50)
 			self.time += 1
-			
-			self.color = (self.color + 5) % maxColor					
-			
+
+			if oneIn(20):
+				self.width = upORdown(self.width, 1, 1, 8)
 			yield self.speed
 
-		
-	
 	def draw_nested_triangles(self):
-		for corner in all_left_corners():
-			nested_cells = nested_triangles(corner)			
-
-			for i in range(len(nested_cells)):
-				ring_size = len(nested_cells[i])
-				for j in range(ring_size):
-					self.tri.set_cell(nested_cells[i][j],
-						gradient_wheel(self.color,
-							self.get_att(ring_size/5,j,self.time)))
+		for k, corner in enumerate(all_left_corners()):
+			for j, triangle in enumerate(nested_triangles(corner)):
+				ring_size = len(triangle)
+				for i, cell in enumerate(triangle):
+					adj_color = self.color + (j * 40)
+					color = gradient_wheel(adj_color, self.get_att(ring_size / (1 + ((k + self.width) % 7)) , i, self.time))
+					self.tri.set_cell(cell, color)
