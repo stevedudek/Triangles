@@ -14,6 +14,7 @@ import util
 
 SPEED_MULT = 2  # Multiply every delay by this value. Higher = much slower shows
 
+
 def speed_interpolation(val):
     """
     Interpolation function to map OSC input into ShowRunner speed_x
@@ -32,6 +33,7 @@ def speed_interpolation(val):
 
 low_interp = util.make_interpolater(0.0, 0.5, 10.0, 1.0)
 hi_interp  = util.make_interpolater(0.5, 1.0, 1.0, 0.1)
+
 
 class ShowRunner(threading.Thread):
     def __init__(self, model, simulator, queue, max_showtime=1000):
@@ -141,7 +143,6 @@ class ShowRunner(threading.Thread):
     def clear(self):
         self.model.clear()
 
-
     def next_show(self, name=None):
         s = None
         if name:
@@ -187,18 +188,8 @@ class ShowRunner(threading.Thread):
                 if delay:
                     adj_delay = delay * SPEED_MULT
 
-                    # Fade in & fade out shows
-                    fade_time = 3  # In seconds. Adjust fade_time here
-
-                    if self.show_runtime < fade_time:
-                        fract = float(self.show_runtime) / fade_time
-                    elif self.show_runtime > (self.max_show_time - fade_time):
-                        fract = float(self.max_show_time - self.show_runtime) / fade_time
-                    else:
-                        fract = 1   # default: no fade
-
                     # Send all the next_frame data - don't change lights
-                    self.model.go(fract)
+                    self.model.go(self.get_fade_fract())
                     self.model.send_delay(adj_delay)
 
                     time.sleep(adj_delay)  # The only delay!
@@ -217,6 +208,22 @@ class ShowRunner(threading.Thread):
                 traceback.print_exc()
                 self.next_show()
 
+    def get_fade_fract(self):
+        """Check to see whether show is at the beginning or end
+           Send a < 1.0 fade fraction if so; otherwise return 1.0 """
+
+        FADE_TIME = 2.0  # Adjust this to change fade-in and fade-out times in seconds
+
+        if self.show_runtime < FADE_TIME:
+            fract = self.show_runtime / FADE_TIME
+        elif self.show_runtime > self.max_show_time - FADE_TIME:
+            fract = (self.max_show_time - self.show_runtime) / FADE_TIME
+        else:
+            fract = 1
+
+        return fract
+
+
 def osc_listener(q, port=5700):
     "Create the OSC Listener thread"
     print "trying OSC"
@@ -228,6 +235,7 @@ def osc_listener(q, port=5700):
     st = threading.Thread(name="OSC Listener", target=osc.serve_forever)
     st.daemon = True
     return st
+
 
 class TriangleServer(object):
     def __init__(self, triangle_model, triangle_simulator, args):

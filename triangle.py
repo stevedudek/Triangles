@@ -75,7 +75,7 @@ class Triangle(object):
         self.set_cells(coords, (0, 0, 0))
 
     def black_all_cells(self):
-        self.set_all_cells((0, 0, 0))  # Black
+        self.set_all_cells((0, 0, 0))
 
     def clear(self):
         self.force_frame()

@@ -8,7 +8,7 @@
   Includes Tiling of
   Multiple Big Triangle Grids
   
-  7/8/18
+  7/25/18
   
   Built on glorious Hex Simulator
   
@@ -65,7 +65,6 @@ import com.heroicrobot.dropbit.devices.pixelpusher.PusherCommand;
 import processing.net.*;
 import java.util.*;
 import java.util.regex.*;
-import processing.video.*;  // For video
 
 // network vars
 int port = 4444;
@@ -204,7 +203,7 @@ void setup() {
   stroke(0);
   fill(255,255,0);
   
-  frameRate(60); // default 60 seems excessive
+  frameRate(60);
   
   // Set up the Big Triangles and stuff in the little triangles
   for (int i = 0; i < NUM_BIG_TRI; i++) {
@@ -221,7 +220,7 @@ void setup() {
   
   initializeColorBuffers();  // Stuff curr/next/morph frames with zeros (all black)
   
-  background(200);
+  background(200);  // gray
   
   _server = new Server(this, port);
   println("server listening:" + _server);
@@ -231,7 +230,6 @@ void setup() {
 // Draw - Main function
 //
 void draw() {
-  print_memory_usage();
   drawBottomControls();
   pollServer();        // Get messages from python show runner
   update_morph();      // Morph between current frame and next frame
@@ -239,7 +237,6 @@ void draw() {
     drawTriangles();     // Draw frames and triangles
   }
   sendDataToLights();  // Dump data into lights
-  pushColorBuffer();   // Push the frame buffers
 }
 
 void drawTriangles() {  
@@ -836,9 +833,10 @@ void processPixelCommand(String cmd) {
 // Get ready for the next morph cycle by morphing to the max and pushing the frame buffer
 //
 void finishCycle() {
-//  morph_frame(1.0);  // Causes jerky animations (removed)
+  morph_frame(1.0);  // May work after all
   pushColorBuffer();
-  start_time = last_time;  // = millis(); // reset the clock
+  start_time = millis();  // reset the clock
+//  start_time = last_time;  // = millis(); // reset the clock
 }
 
 //
@@ -888,9 +886,9 @@ void movePixelsToBuffer() {
 void sendColorOut(byte t, int p, short r, short g, short b, boolean morph) {
   color correct = colorCorrect(r,g,b);  // all-red, all-blue, etc.
   
-  r = (short)red(correct);
-  g = (short)green(correct);
-  b = (short)blue(correct);
+  r = adj_brightness(red(correct));
+  g = adj_brightness(green(correct));
+  b = adj_brightness(blue(correct));
   
   if (TILING) {
     triGrid[t].setCellColor(color(r,g,b), p);  // Simulator
@@ -911,7 +909,7 @@ void sendDataToLights() {
   
   if (testObserver.hasStrips) {   
     registry.startPushing();
-    registry.setExtraDelay(10);
+    registry.setExtraDelay(0);
     registry.setAutoThrottle(true);
     registry.setAntiLog(true);    
     
@@ -920,9 +918,7 @@ void sendDataToLights() {
     
     for (Strip strip : strips) {      
       for (p = 0; p < NUM_PIXELS; p++) {
-         if (hasChanged(t,p)) {
-           strip.setPixel(getPixelBuffer(t, p), p);
-         }
+         strip.setPixel(getPixelBuffer(t, p), p);
       }
       t++;
       if (t >= NUM_BIG_TRI) break;  // Prevents buffer overflow
@@ -977,13 +973,8 @@ void morph_frame(float fract) {
   }
 }
 
-color adj_brightness(color c, int brightness) {
-  if (brightness == 100) {
-    return c;  // No adjustment needed at full brightness
-  }
-  return color(  red(c) * brightness / 100.0,
-               green(c) * brightness / 100.0,
-                blue(c) * brightness / 100.0);
+short adj_brightness(float value) {
+  return (short)(value * BRIGHTNESS / 100);
 }
 
 color colorCorrect(int r, int g, int b) {
@@ -1094,6 +1085,7 @@ color getPixelBuffer(byte t, int p) {
                morph_buffer[t][p][2]);
 }
 
+// DON'T USE
 boolean hasChanged(byte t, int p) {
   if (curr_buffer[t][p][0] != next_buffer[t][p][0] ||
       curr_buffer[t][p][1] != next_buffer[t][p][1] ||
