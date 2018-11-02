@@ -34,8 +34,9 @@ class Trail(object):
 	
 	def fade_trail(self):
 		self.intense -= 0.15
-		if self.intense > 0: return True
-		else: return False
+
+	def is_alive(self):
+		return self.intense > 0
 
         		
 class Planet(object):
@@ -49,36 +50,28 @@ class Planet(object):
 		self.arc_count = arc
 		self.size = size
 		self.trails = []	# List that holds trails
-		self.life = randint(20,300)
+		self.life = randint(20, 300)
 		
 	def draw_planet(self):
 		
 		self.fade_trails()
-			
-		# Draw the center
-		self.draw_add_trail(self.color, 1, self.pos)
+		self.draw_add_trail(self.color, 1, self.pos)  # Draw the center
 		
 		# Draw an outer ring(s)
 		for i in range(self.size):
 			for c in get_ring(self.pos, i):
 				self.draw_add_trail(self.color, 1, c)
 	
-	
 	def move_planet(self):
 		self.pos = tri_in_direction(self.pos, self.dir, 2)
 		self.arc_count -= 1
+		self.life -= 1
 		if self.arc_count == 0:
 			self.arc_count = self.arc
-			if self.rotation == 0:
-				self.dir = turn_left(self.dir)
-			else:
-				self.dir = turn_right(self.dir)
-		
-		self.life -= 1
-		if self.life > 0:
-			return True
-		else:
-			return False
+			self.dir = turn_left(self.dir) if self.rotation == 0 else turn_right(self.dir)
+
+	def is_alive(self):
+		return self.life > 0
 		
 	def draw_add_trail(self, color, intense, pos):
 		self.tri.set_cell(pos, gradient_wheel(color, intense))
@@ -88,8 +81,14 @@ class Planet(object):
 	def fade_trails(self):
 		for t in reversed(self.trails):	# Plot last-in first
 			t.draw_trail()
-			if t.fade_trail() == False:
+			t.fade_trail()
+			if not t.is_alive():
 				self.trails.remove(t)
+
+	def kill_trails(self):
+		for t in self.trails:
+			self.trails.remove(t)
+
 						
 class Planets(object):
 	def __init__(self, trimodel):
@@ -107,38 +106,34 @@ class Planets(object):
 		while (True):
 			
 			if len(self.planets) < 10:
-				new_center = choice(all_centers())
-				new_planet = Planet(self.tri,
-					choice(get_ring(new_center, 3)),
-					randint(2,6),
-					randColor(), 2)
+				new_planet = Planet(trimodel=self.tri,
+									pos=choice(get_ring(choice(all_centers()), 3)),
+									arc=randint(2,6),
+									color=randColor(),
+									size=choice([1,2,3])
+									)
 				self.planets.append(new_planet)
 			
-			# Set background to black
-			self.tri.set_all_cells((0,0,0))
+			self.tri.black_all_cells()
 			
-			# Draw the Planets
-				
 			for p in self.planets:
 				p.draw_planet()
-				if p.move_planet() == False:
-					
+				p.move_planet()
+
+				if not p.is_alive():
 					for dir in range(maxDir):	# Cause explosion of bullets
-						bull_color = randColorRange(p.color, 50)
-						new_bullet = Bullet(self.tri, p.pos, bull_color, dir)
-						self.bullets.append(new_bullet)
-						
+						self.bullets.append(Bullet(trimodel=self.tri,
+												   pos=p.pos,
+												   color=randColorRange(p.color, 50),
+												   dir=dir))
+					p.kill_trails()
 					self.planets.remove(p)	# Kill Planet
-			
-			# Draw the Bullets
 			
 			for b in self.bullets:
 				b.draw_bullet()
-				if b.move_bullet() == False:
+				if not b.move_bullet():
 					self.bullets.remove(b)
 					
-			# Change the colors
-			
 			self.color = (self.color + 10) % maxColor
 			
 			yield self.speed

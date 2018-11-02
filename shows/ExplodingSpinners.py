@@ -1,30 +1,24 @@
 from HelperFunctions import*
 from triangle import*
+from math import sin
         		
 class Spinner(object):
 	def __init__(self, trimodel, pos):
 		self.tri = trimodel
 		self.pos = pos
 		self.expand = 0	# -1: contracting, 0: nothing, 1: expanding
-		self.size = 1
+		self.size = 2
 	
 	def explode_spinner(self):
 		self.expand = 1
 	
 	def is_resting(self):
-		if self.expand == 0:
-			return True
-		else:
-			return False
+		return self.expand == 0
 
 	def draw_spinner(self, spincolor, explodecolor, time):
-		if self.expand == 0:
-			color = spincolor
-		else:
-			color = explodecolor
-			
-		# Draw the center
-		self.tri.set_cell(self.pos, wheel(color))
+		color = spincolor if self.expand == 0 else explodecolor
+
+		self.tri.set_cell(self.pos, wheel(color))  # Draw the center
 		
 		# Draw the spinning bits
 		for i in range(0, self.size + 1):
@@ -32,22 +26,15 @@ class Spinner(object):
 			num = len(ringcells)
 			if num > 0:
 				for j in range(num):
-					gradient = 1 - (abs(j - (time % num)) / (num - 0.0) )
-					self.tri.set_cell(ringcells[j], gradient_wheel(color, gradient))
+					intensity = (sin(2 * 3.1415 * ((j + time) % num) / num) + 1) * 0.5
+					self.tri.set_cell(ringcells[j], gradient_wheel(color, intensity))
 	
 	def move_spinner(self):
-		newspot = tri_in_direction(self.pos, randDir(), 2)
-		if self.tri.is_on_board(newspot):
-			self.pos = newspot
-			
-		if self.expand == 1:
-			self.size += 1
-			if self.size > 12:
-				self.expand = -1	# Contract!
-		elif self.expand == -1:
-			self.size -= 1
-			if self.size <= 1:
-				self.expand = 0	# Done
+		self.size += self.expand
+		if self.size > 12:
+			self.expand = -1  # Contract!
+		if self.size <= 0:
+			self.expand = 0	 # Done
 		
 			
 				
@@ -57,8 +44,8 @@ class ExplodingSpinners(object):
 		self.tri = trimodel
 		self.spinners = []	# List that holds Spinner objects
 		self.speed = 0.05
-		self.explodecolor = randColor()	# Color for exploding spinner
-		self.spincolor =  randColor()	# Spinner color
+		self.explodecolor = randColor()  # Color for exploding spinner
+		self.spincolor =  randColor()  # Spinner color
 		self.time = 0
 		          
 	def next_frame(self):
@@ -70,20 +57,14 @@ class ExplodingSpinners(object):
 			# Draw the spinners - draw exploding spinners last
 				
 			for s in self.spinners:
-				if s.is_resting():
-					s.draw_spinner(self.spincolor, self.explodecolor, self.time)
-				
-			for s in self.spinners:
-				if s.is_resting() == False:
-					s.draw_spinner(self.spincolor, self.explodecolor, self.time)
+				s.draw_spinner(self.spincolor, self.explodecolor, self.time)
+				if not s.is_resting():
 					s.move_spinner()
 			
 			self.time += 1
 			
-			# Explode a spinner
-			
-			if self.all_resting() == True and oneIn(20):
-				choice(self.spinners).explode_spinner()
+			if self.all_resting() and oneIn(20):
+				choice(self.spinners).explode_spinner()  # Explode a spinner
 			
 			# Change the colors
 			
@@ -91,23 +72,10 @@ class ExplodingSpinners(object):
 			
 			self.spincolor = (maxColor + self.spincolor - 2) % maxColor
 			
-			yield self.speed  	# random time set in init function
+			yield self.speed
 	
-	# all_resting
-
 	def all_resting(self):
-		for s in self.spinners:
-			if s.is_resting() == False:
-				return False
-		return True
-
-	# Initialize the spinners
+		return all([s.is_resting() for s in self.spinners])
 
 	def set_up_spinners(self):
-		for center in all_centers():
-			newspinner = Spinner(self.tri, center)
-			self.spinners.append(newspinner)
-
-		for corner in all_corners():
-			newspinner = Spinner(self.tri, corner)
-			self.spinners.append(newspinner)
+		self.spinners.extend([Spinner(self.tri, coord) for coord in all_centers() + all_corners()])

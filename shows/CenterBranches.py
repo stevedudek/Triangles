@@ -10,11 +10,7 @@ class Branch(object):
 		self.life = life	# How long the branch has been around
 
 	def draw_branch(self, inversion):
-		if inversion:
-			ratio = self.life/10.0 # dark center
-		else:
-			ratio = 1 - self.life/40.0 # light center
-		
+		ratio = self.life / 10.0 if inversion else 1 - self.life / 40.0
 		self.tri.set_cell(self.pos, gradient_wheel(self.color, ratio))
 							
 		# Random chance that path changes
@@ -45,13 +41,13 @@ class CenterBranches(object):
 			
 			# Add a center branch
 			
-			if len(self.livebranches) == 0 or oneIn(30):
+			if len(self.livebranches) == 0 or oneIn(10):
 				for center in all_centers():
-					newbranch = Branch(self.tri,
-						self.maincolor, # color
-						center, 		# center
-						randDir(), 		# Random initial direction
-						0)				# Life = 0 (new branch)
+					newbranch = Branch(trimodel=self.tri,
+									   color=self.maincolor,
+									   pos=center,
+									   dir=randDir(),
+									   life=0)
 					self.livebranches.append(newbranch)
 				self.maincolor = (self.maincolor + 50) % maxColor
 				

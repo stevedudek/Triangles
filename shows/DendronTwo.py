@@ -10,7 +10,7 @@ class Dendron(object):
 		self.life = life
 
 	def draw_dendron(self):
-		intensity = 1.0 - (self.life / 100.0)
+		intensity = 1.0 - (self.life / 50.0)
 		self.tri.set_cells(self.tri.mirror_coords(self.pos), white_wheel(self.color, intensity))
 							
 		if oneIn(4):
@@ -25,12 +25,12 @@ class Dendron(object):
 		return False	# Off board. Kill
 	
 
-class Dendrons(object):
+class DendronsTwo(object):
 	def __init__(self, trimodel):
-		self.name = "Dendrons"        
+		self.name = "DendronsTwo"
 		self.tri = trimodel
 		self.livedendrons = []	# List that holds Dendron objects
-		self.speed = 0.02
+		self.speed = 0.01
 		self.maincolor =  randColor()	# Main color of the show
 		          
 	def next_frame(self):
@@ -41,7 +41,7 @@ class Dendrons(object):
 			if len(self.livedendrons) < 20 and oneIn(5):
 				newdendron = Dendron(trimodel=self.tri,
 									 color=randColorRange(self.maincolor, 50),
-									 pos=choice(all_centers()),
+									 pos=choice(all_corners()),
 									 dir=maxDir,
 									 life=0)
 				self.livedendrons.append(newdendron)
@@ -50,7 +50,7 @@ class Dendrons(object):
 				d.draw_dendron()
 				
 				# Chance for branching
-				if oneIn(20):	# Create a fork
+				if oneIn(40):	# Create a fork
 					newdir = turn_left_or_right(d.dir)
 					newdendron = Dendron(self.tri, d.color, d.pos, newdir, d.life)
 					self.livedendrons.append(newdendron)
@@ -58,7 +58,7 @@ class Dendrons(object):
 				if not d.move_dendron():  # dendron has moved off the board
 					self.livedendrons.remove(d) 	# kill the branch
 
-			if oneIn(20):
-				self.maincolor = randColorRange(self.maincolor, 100)				
+			if oneIn(50):
+				self.maincolor = randColorRange(self.maincolor, 200)
 			
 			yield self.speed
