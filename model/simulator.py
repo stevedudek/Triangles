@@ -37,16 +37,12 @@ class SimulatorModel(object):
         for cell in cells:
             self.set_cell(cell, color)
 
-    def go(self):
+    def go(self, fract=1):
         "Send all of the buffered commands"
+        self.send_start()
         for (cell, color) in self.dirty.items():
             (strip, pixel) = cell
-            (r,g,b) = self.constrain_color(color)
-            # if color.RGB == (0,0,0):
-                # r,g,b = SIM_DEFAULT
-            # else:
-                # r,g,b = color.RGB
-            
+            (r,g,b) = self.constrain_color(color, fract)
             msg = "%s,%s,%s,%s,%s" % (strip, pixel, r,g,b)
             
             if self.debug:
@@ -55,6 +51,24 @@ class SimulatorModel(object):
             self.sock.send('\n')
 
         self.dirty = {}
+
+    def send_start(self):
+        "send a start signal"
+        msg = "X"   # tell processing that commands are coming
+
+        if self.debug:
+            print msg
+        self.sock.send(msg)
+        self.sock.send('\n')
+
+    def send_delay(self, delay):
+        "send a morph amount in milliseconds"
+        msg = "D%s" % (str(int(delay * 1000)))
+
+        if self.debug:
+            print msg
+        self.sock.send(msg)
+        self.sock.send('\n')
 
     def relay_OSC_cmd(self, cmd, value):
         "Relay to Processing the OSC command"
@@ -65,13 +79,13 @@ class SimulatorModel(object):
         self.sock.send(msg)
         self.sock.send('\n')
 
-    def constrain_color(self, color):
+    def constrain_color(self, color, fract=1):
         (r,g,b) = color
-        return (self.constrain(r), self.constrain(g), self.constrain(b))
+        return (self.constrain(r, fract), self.constrain(g, fract), self.constrain(b, fract))
 
-    def constrain(self, value):
+    def constrain(self, value, fract=1):
         "Keep color values between 0-255 and make whole numbers"
-        value = int(value)
+        value = int(value * fract)
         if value < 0: value = 0
         if value > 255: value = 255
         return value

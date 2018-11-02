@@ -67,22 +67,27 @@ from copy import deepcopy
 
 __all__=['RGB', 'HSV', 'Hex', 'Color']
 
+
 def clamp(val, min_value, max_value):
     "Restrict a value between a minimum and a maximum value"
     return max(min(val, max_value), min_value)
+
 
 def is_hsv_tuple(hsv):
     "check that a tuple contains 3 values between 0.0 and 1.0"
     return len(hsv) == 3 and all([(0.0 <= t <= 1.0) for t in hsv])
 
+
 def is_rgb_tuple(rgb):
     "check that a tuple contains 3 values between 0 and 255"
     return len(rgb) == 3 and all([(0 <= t <= 255) for t in rgb])
+
 
 def rgb_to_hsv(rgb):
     "convert a rgb[0-255] tuple to hsv[0.0-1.0]"
     f = float(255)
     return colorsys.rgb_to_hsv(rgb[0]/f, rgb[1]/f, rgb[2]/f)
+
 
 def hsv_to_rgb(hsv):
     assert is_hsv_tuple(hsv), "malformed hsv tuple:" + str(hsv)
@@ -92,15 +97,34 @@ def hsv_to_rgb(hsv):
     b = int(_rgb[2] * 0xff)
     return (r,g,b)
 
+
+def rgb_morph(rgb1, rgb2):
+    "interpolate between two rgb's"
+    return hsv_to_rgb(hsv_morph(rgb_to_hsv(rgb1), rgb_to_hsv(rgb2)))
+
+
+def hsv_morph(hsv1, hsv2):
+    "interpolate between two hsv's"
+    return HSV(interpolate(hsv1.h, hsv2.h),
+               interpolate(hsv1.s, hsv2.s),
+               interpolate(hsv1.v, hsv2.v))
+
+
+def interpolate(val1, val2):
+    return val1 + ((val2 - val1) / 2.0)
+
+
 def RGB(r,g,b):
     "Create a new RGB color"
     t = (r,g,b)
     assert is_rgb_tuple(t)
     return Color(rgb_to_hsv(t))
 
+
 def HSV(h,s,v):
     "Create a new HSV color"
     return Color((h,s,v))
+
 
 def Hex(value):
     "Create a new Color from a hex string"
@@ -108,6 +132,7 @@ def Hex(value):
     lv = len(value)
     rgb_t = (int(value[i:i+lv/3], 16) for i in range(0, lv, lv/3))
     return RGB(*rgb_t)
+
 
 class Color(object):
     def __init__(self, hsv_tuple):

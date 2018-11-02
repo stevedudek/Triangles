@@ -1,16 +1,19 @@
 #!/usr/bin/env python2.7
 import sys
 import time
+import resource
 import traceback
 import Queue
 import threading
-import signal
 
 import triangle
 import shows
 import util
 
 # import cherrypy
+
+SPEED_MULT = 2  # Multiply every delay by this value. Higher = much slower shows
+
 
 def speed_interpolation(val):
     """
@@ -30,6 +33,7 @@ def speed_interpolation(val):
 
 low_interp = util.make_interpolater(0.0, 0.5, 10.0, 1.0)
 hi_interp  = util.make_interpolater(0.5, 1.0, 1.0, 0.1)
+
 
 class ShowRunner(threading.Thread):
     def __init__(self, model, simulator, queue, max_showtime=1000):
@@ -51,9 +55,6 @@ class ShowRunner(threading.Thread):
         self.framegen = None
 
         # current show parameters
-
-        # video is off at the stop
-        self.video = False
 
         # show speed multiplier - ranges from 0.1 to 10
         # 1.0 is normal speed
@@ -112,18 +113,8 @@ class ShowRunner(threading.Thread):
             (ns, cmd) = addr[1:].split('/')
             if ns == '1':
                 # control command
-                if cmd == 'video':
-                    self.video = not self.video
-                    self.send_OSC_cmd('video', 0)
+                if cmd == 'next':
                     if self.video:
-                        print "turning video on"
-                    else:
-                        print "turning video off"                    
-                elif cmd == 'next':
-                    if self.video:
-                        print "next video"
-                        self.send_OSC_cmd('nextvideo', 0)
-                    else:
                         print "next show"
                         self.next_show()
                 elif cmd == 'previous':
@@ -152,7 +143,6 @@ class ShowRunner(threading.Thread):
     def clear(self):
         self.model.clear()
 
-
     def next_show(self, name=None):
         s = None
         if name:
@@ -167,9 +157,8 @@ class ShowRunner(threading.Thread):
 
         self.clear()
         self.prev_show = self.show
-
         self.show = s(self.model)
-        print "next show:" + self.show.name
+        print "next show: " + self.show.name
         self.framegen = self.show.next_frame()
         self.show_params = hasattr(self.show, 'set_param')
         self.show_runtime = 0
@@ -189,16 +178,25 @@ class ShowRunner(threading.Thread):
             try:
                 self.check_queue()
 
-                d = self.get_next_frame()
-                self.model.go()
-                if d:
-                    real_d = d * self.speed_x
-                    time.sleep(real_d)
-                    self.show_runtime += real_d
+                delay = self.get_next_frame()
+
+                # # Print python heap size
+                # megabytes = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1000000
+                # if megabytes > 30:
+                #     print "Using: {}Mb".format(megabytes)
+
+                if delay:
+                    adj_delay = delay * SPEED_MULT
+
+                    # Send all the next_frame data - don't change lights
+                    self.model.go(self.get_fade_fract())
+                    self.model.send_delay(adj_delay)
+
+                    time.sleep(adj_delay)  # The only delay!
+
+                    self.show_runtime += adj_delay
                     if self.show_runtime > self.max_show_time:
                         print "max show time elapsed, changing shows"
-                        # self.queue.put("run_show:") #next_show
-                        # self.queue.put("clear") #next_show
                         self.next_show()
                 else:
                     print "show is out of frames, waiting..."
@@ -209,6 +207,22 @@ class ShowRunner(threading.Thread):
                 print "unexpected exception in show loop!"
                 traceback.print_exc()
                 self.next_show()
+
+    def get_fade_fract(self):
+        """Check to see whether show is at the beginning or end
+           Send a < 1.0 fade fraction if so; otherwise return 1.0 """
+
+        FADE_TIME = 2.0  # Adjust this to change fade-in and fade-out times in seconds
+
+        if self.show_runtime < FADE_TIME:
+            fract = self.show_runtime / FADE_TIME
+        elif self.show_runtime > self.max_show_time - FADE_TIME:
+            fract = (self.max_show_time - self.show_runtime) / FADE_TIME
+        else:
+            fract = 1
+
+        return fract
+
 
 def osc_listener(q, port=5700):
     "Create the OSC Listener thread"
@@ -221,6 +235,7 @@ def osc_listener(q, port=5700):
     st = threading.Thread(name="OSC Listener", target=osc.serve_forever)
     st.daemon = True
     return st
+
 
 class TriangleServer(object):
     def __init__(self, triangle_model, triangle_simulator, args):
@@ -260,9 +275,7 @@ class TriangleServer(object):
         try:
             if self.osc_thread:
                 self.osc_thread.start()
-
             self.runner.start()
-
             self.running = True
         except Exception, e:
             print "Exception starting Triangles!"
@@ -353,8 +366,8 @@ if __name__=='__main__':
     import argparse
     parser = argparse.ArgumentParser(description='Triangles Light Control')
 
-    parser.add_argument('--max-time', type=float, default=float(180),
-                        help='Maximum number of seconds a show will run (default 180)')
+    parser.add_argument('--max-time', type=float, default=float(30),
+                        help='Maximum number of seconds a show will run (default 30)')
 
     # Simulator must run to turn on lights
     # parser.add_argument('--simulator',dest='simulator',action='store_true')
